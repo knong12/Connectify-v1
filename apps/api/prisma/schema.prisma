@@ -1,0 +1,96 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                   String              @id @default(uuid())
+  email                String              @unique
+  displayName          String
+  spotifyUserId        String              @unique
+  spotifyProfileImage  String?
+  spotifyAccessToken   String?
+  spotifyRefreshToken  String?
+  spotifyConnected     Boolean             @default(false)
+  createdAt            DateTime            @default(now())
+  updatedAt            DateTime            @updatedAt
+  favoriteGenres       UserFavoriteGenre[]
+  favoriteArtists      UserFavoriteArtist[]
+  favoriteTracks       UserFavoriteTrack[]
+}
+
+model Genre {
+  id        String              @id @default(uuid())
+  slug      String              @unique
+  label     String
+  createdAt DateTime            @default(now())
+  users     UserFavoriteGenre[]
+}
+
+model Artist {
+  id        String               @id @default(uuid())
+  spotifyId String               @unique
+  name      String
+  imageUrl  String?
+  createdAt DateTime             @default(now())
+  updatedAt DateTime             @updatedAt
+  genres    String[]
+  users     UserFavoriteArtist[]
+}
+
+model Track {
+  id         String              @id @default(uuid())
+  spotifyId  String              @unique
+  name       String
+  artistName String
+  albumName  String?
+  albumArt   String?
+  previewUrl String?
+  createdAt  DateTime            @default(now())
+  updatedAt  DateTime            @updatedAt
+  users      UserFavoriteTrack[]
+}
+
+model UserFavoriteGenre {
+  id        String   @id @default(uuid())
+  userId    String
+  genreId   String
+  rank      Int
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  genre     Genre    @relation(fields: [genreId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, genreId])
+  @@unique([userId, rank])
+}
+
+model UserFavoriteArtist {
+  id        String   @id @default(uuid())
+  userId    String
+  artistId  String
+  rank      Int
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  artist    Artist   @relation(fields: [artistId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, artistId])
+  @@unique([userId, rank])
+}
+
+model UserFavoriteTrack {
+  id        String   @id @default(uuid())
+  userId    String
+  trackId   String
+  rank      Int
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  track     Track    @relation(fields: [trackId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, trackId])
+  @@unique([userId, rank])
+}
+
