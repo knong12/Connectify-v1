@@ -1,14 +1,12 @@
-# Connectify v2
+# Connectify v1
 
-A clean restart of Connectify focused on one small milestone:
+
 
 1. A user signs in with Spotify.
-2. We sync their top music data into Postgres.
-3. We show a simple matches list.
+2. Sync their top music data into Postgres.
+3. Show a simple matches list.
 
-## Why this restart exists
 
-The original project mixed ports, hardcoded API URLs, and partially finished flows. This version resets around a smaller contract:
 
 - `apps/api` owns Spotify auth, persistence, and matching
 - `apps/web` is a thin UI over stable API routes
