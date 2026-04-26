@@ -44,9 +44,7 @@ export async function upsertUserFromSpotify(
 export async function finishSpotifyLogin(profile: SpotifyProfile, tokens: SpotifyTokenResponse) {
   const user = await upsertUserFromSpotify(profile, tokens);
 
-  // Step 6:
-  // After you have Spotify fetch code working, uncomment this call.
-  // await syncTopMusicData(user.id, tokens.access_token);
+  await syncTopMusicData(user.id, tokens.access_token);
 
   const appToken = jwt.sign(
     {
@@ -64,4 +62,3 @@ export async function finishSpotifyLogin(profile: SpotifyProfile, tokens: Spotif
     appToken
   };
 }
-
