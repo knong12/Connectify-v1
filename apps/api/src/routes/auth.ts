@@ -16,12 +16,7 @@ const router = Router();
 router.get('/spotify', (_req, res) => {
   const state = createSpotifyAuthState();
   const authUrl = buildSpotifyAuthorizeUrl(state);
-
-  res.json({
-    message: 'Step 2: open this URL to start Spotify auth.',
-    nextStep: 'After Spotify redirects back, implement the callback route flow.',
-    url: authUrl.toString()
-  });
+  res.redirect(authUrl.toString());
 });
 
 router.get('/spotify/callback', async (req, res) => {
@@ -50,13 +45,11 @@ router.get('/spotify/callback', async (req, res) => {
     const tokens = await exchangeCodeForTokens(code);
     const profile = await fetchSpotifyProfile(tokens.access_token);
     const { appToken, user } = await finishSpotifyLogin(profile, tokens);
+    const redirectUrl = new URL('/profile', env.CLIENT_URL);
+    redirectUrl.searchParams.set('token', appToken);
+    redirectUrl.searchParams.set('userId', user.id);
 
-    res.json({
-      message: 'Spotify login flow completed.',
-      nextStep: 'Redirect this result back to the frontend and store appToken.',
-      appToken,
-      user
-    });
+    res.redirect(redirectUrl.toString());
   } catch (error) {
     if (error instanceof NotImplementedError) {
       res.status(501).json({

@@ -104,9 +104,100 @@ code {
   color: #51657d;
 }
 
+.muted {
+  margin: 0.25rem 0 0;
+  color: #5f7288;
+}
+
+.profile-hero {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 1rem;
+  align-items: center;
+}
+
+.avatar {
+  width: 120px;
+  height: 120px;
+  object-fit: cover;
+  border-radius: 24px;
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 0.75rem;
+}
+
+.stat {
+  padding: 1rem;
+  border-radius: 18px;
+  background: #f4f8fc;
+}
+
+.stat strong {
+  display: block;
+  font-size: 2rem;
+  margin-top: 0.4rem;
+}
+
+.stat-label {
+  color: #5f7288;
+  font-size: 0.9rem;
+}
+
+.profile-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.list-grid {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.music-card {
+  display: grid;
+  grid-template-columns: 72px 1fr;
+  gap: 0.9rem;
+  align-items: center;
+  padding: 0.85rem;
+  border-radius: 18px;
+  background: #f8fbff;
+}
+
+.music-card h3 {
+  margin: 0.2rem 0;
+}
+
+.cover-art,
+.cover-fallback {
+  width: 72px;
+  height: 72px;
+  border-radius: 16px;
+}
+
+.cover-art {
+  object-fit: cover;
+}
+
+.cover-fallback {
+  display: grid;
+  place-items: center;
+  background: #dce8f8;
+  color: #102030;
+  font-weight: 700;
+}
+
 @media (max-width: 720px) {
   .topbar {
     align-items: start;
     flex-direction: column;
+  }
+
+  .profile-hero,
+  .profile-grid {
+    grid-template-columns: 1fr;
   }
 }

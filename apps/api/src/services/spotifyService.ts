@@ -53,7 +53,35 @@ export function buildSpotifyAuthorizeUrl(state: string) {
 
 async function parseSpotifyResponse<T>(response: Response, fallbackMessage: string): Promise<T> {
   const text = await response.text();
-  const data = text ? JSON.parse(text) : null;
+  let data: unknown = null;
+
+  if (text) {
+    try {
+      data = JSON.parse(text);
+    } catch {
+      if (!response.ok) {
+        const error = new Error(
+          `${fallbackMessage} Response was not valid JSON: ${text.slice(0, 160)}`
+        ) as Error & {
+          status?: number;
+          spotifyBody?: unknown;
+        };
+        error.status = response.status;
+        error.spotifyBody = text;
+        throw error;
+      }
+
+      const error = new Error(
+        `Spotify returned a non-JSON success response: ${text.slice(0, 160)}`
+      ) as Error & {
+        status?: number;
+        spotifyBody?: unknown;
+      };
+      error.status = response.status;
+      error.spotifyBody = text;
+      throw error;
+    }
+  }
 
   if (!response.ok) {
     const message =

@@ -20,8 +20,40 @@ router.get('/', requireAuth, async (req, res) => {
   }
 
   res.json({
-    message: 'Step 8: shape the response you want the frontend to consume.',
-    user
+    user: {
+      id: user.id,
+      email: user.email,
+      displayName: user.displayName,
+      spotifyUserId: user.spotifyUserId,
+      spotifyProfileImage: user.spotifyProfileImage,
+      spotifyConnected: user.spotifyConnected,
+      createdAt: user.createdAt,
+      updatedAt: user.updatedAt,
+      favoriteGenres: user.favoriteGenres.map((entry) => ({
+        id: entry.genre.id,
+        slug: entry.genre.slug,
+        label: entry.genre.label,
+        rank: entry.rank
+      })),
+      favoriteArtists: user.favoriteArtists.map((entry) => ({
+        id: entry.artist.id,
+        spotifyId: entry.artist.spotifyId,
+        name: entry.artist.name,
+        imageUrl: entry.artist.imageUrl,
+        genres: entry.artist.genres,
+        rank: entry.rank
+      })),
+      favoriteTracks: user.favoriteTracks.map((entry) => ({
+        id: entry.track.id,
+        spotifyId: entry.track.spotifyId,
+        name: entry.track.name,
+        artistName: entry.track.artistName,
+        albumName: entry.track.albumName,
+        albumArt: entry.track.albumArt,
+        previewUrl: entry.track.previewUrl,
+        rank: entry.rank
+      }))
+    }
   });
 });
 

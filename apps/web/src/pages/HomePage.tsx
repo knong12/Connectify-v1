@@ -1,6 +1,7 @@
 import ApiCard from '../components/ApiCard';
+import { getApiUrl } from '../lib/api';
 
-const apiUrl = import.meta.env.VITE_API_URL || 'http://127.0.0.1:5001';
+const apiUrl = getApiUrl();
 
 export default function HomePage() {
   return (
@@ -12,6 +13,10 @@ export default function HomePage() {
           This restart strips the product back to one flow we can make robust
           before adding recommendations, polish, or extra API layers.
         </p>
+        <p>
+          Right now the strongest demo path is Spotify login, saved top artists,
+          saved top tracks, and a profile page that proves the sync worked.
+        </p>
         <a className="button" href={`${apiUrl}/api/auth/spotify`}>
           Start Spotify Auth
         </a>
@@ -20,4 +25,3 @@ export default function HomePage() {
     </div>
   );
 }
-
