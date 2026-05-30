@@ -9,7 +9,7 @@ export default function App() {
       <header className="topbar">
         <div>
           <p className="eyebrow">Connectify v2</p>
-          <h1>Spotify-powered friend matching, rebuilt cleanly.</h1>
+          <h1>Spotify-powered friend matching, Welcome.</h1>
         </div>
         <nav className="nav">
           <NavLink to="/">Home</NavLink>

@@ -13,6 +13,9 @@ model User {
   displayName          String
   spotifyUserId        String              @unique
   spotifyProfileImage  String?
+  bio                  String?
+  favoriteArtistNote   String?
+  musicPrompt          String?
   spotifyAccessToken   String?
   spotifyRefreshToken  String?
   spotifyConnected     Boolean             @default(false)
@@ -93,4 +96,3 @@ model UserFavoriteTrack {
   @@unique([userId, trackId])
   @@unique([userId, rank])
 }
-

@@ -8,14 +8,13 @@ export default function HomePage() {
     <div className="stack">
       <section className="hero">
         <p className="eyebrow">Milestone 1</p>
-        <h2>Log in with Spotify, sync taste data, show a simple match list.</h2>
+        <h2>Log in with Spotify, sync taste data, find a match.</h2>
         <p>
-          This restart strips the product back to one flow we can make robust
-          before adding recommendations, polish, or extra API layers.
+          Test.
         </p>
         <p>
-          Right now the strongest demo path is Spotify login, saved top artists,
-          saved top tracks, and a profile page that proves the sync worked.
+          currently it shows, saved top artists,
+          saved top tracks, and a profile page.
         </p>
         <a className="button" href={`${apiUrl}/api/auth/spotify`}>
           Start Spotify Auth

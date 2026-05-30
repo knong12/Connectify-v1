@@ -22,3 +22,20 @@ export async function getUserProfileById(userId: string) {
   });
 }
 
+export async function updateUserProfile(
+  userId: string,
+  payload: {
+    bio: string;
+    favoriteArtistNote: string;
+    musicPrompt: string;
+  }
+) {
+  return prisma.user.update({
+    where: { id: userId },
+    data: {
+      bio: payload.bio || null,
+      favoriteArtistNote: payload.favoriteArtistNote || null,
+      musicPrompt: payload.musicPrompt || null
+    }
+  });
+}
