@@ -2,6 +2,7 @@ import cors from 'cors';
 import express from 'express';
 import { env } from './config/env.js';
 import authRoutes from './routes/auth.js';
+import followRoutes from './routes/follows.js';
 import healthRoutes from './routes/health.js';
 import matchesRoutes from './routes/matches.js';
 import meRoutes from './routes/me.js';
@@ -18,6 +19,7 @@ app.use(express.json());
 
 app.use('/health', healthRoutes);
 app.use('/api/auth', authRoutes);
+app.use('/api/follows', followRoutes);
 app.use('/api/me', meRoutes);
 app.use('/api/matches', matchesRoutes);
 

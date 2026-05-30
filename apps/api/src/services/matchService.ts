@@ -5,6 +5,9 @@ export type MatchPreview = {
   displayName: string;
   spotifyUserId: string;
   spotifyProfileImage: string | null;
+  bio: string | null;
+  favoriteArtistNote: string | null;
+  isFollowing: boolean;
   score: number;
   sharedArtists: number;
   sharedTracks: number;
@@ -21,6 +24,7 @@ function normalizeScore(sharedArtists: number, sharedTracks: number) {
 export async function rankMatches(userId: string): Promise<MatchPreview[]> {
   const users = await prisma.user.findMany({
     include: {
+      following: true,
       favoriteArtists: {
         include: { artist: true },
         orderBy: { rank: 'asc' }
@@ -44,6 +48,7 @@ export async function rankMatches(userId: string): Promise<MatchPreview[]> {
   const currentTrackIds = new Set(
     currentUser.favoriteTracks.map((favorite) => favorite.track.spotifyId)
   );
+  const currentFollowingIds = new Set(currentUser.following.map((entry) => entry.followingId));
 
   return users
     .filter((candidate) => candidate.id !== userId)
@@ -60,6 +65,9 @@ export async function rankMatches(userId: string): Promise<MatchPreview[]> {
         displayName: candidate.displayName,
         spotifyUserId: candidate.spotifyUserId,
         spotifyProfileImage: candidate.spotifyProfileImage,
+        bio: candidate.bio,
+        favoriteArtistNote: candidate.favoriteArtistNote,
+        isFollowing: currentFollowingIds.has(candidate.id),
         score: normalizeScore(sharedArtists.length, sharedTracks.length),
         sharedArtists: sharedArtists.length,
         sharedTracks: sharedTracks.length,

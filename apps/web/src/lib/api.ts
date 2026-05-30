@@ -11,6 +11,20 @@ export type ProfileResponse = {
     bio: string | null;
     favoriteArtistNote: string | null;
     musicPrompt: string | null;
+    followerCount: number;
+    followingCount: number;
+    followers: {
+      id: string;
+      displayName: string;
+      spotifyUserId: string;
+      spotifyProfileImage: string | null;
+    }[];
+    followingUsers: {
+      id: string;
+      displayName: string;
+      spotifyUserId: string;
+      spotifyProfileImage: string | null;
+    }[];
     createdAt: string;
     updatedAt: string;
     favoriteGenres: {
@@ -46,6 +60,9 @@ export type MatchesResponse = {
     displayName: string;
     spotifyUserId: string;
     spotifyProfileImage: string | null;
+    bio: string | null;
+    favoriteArtistNote: string | null;
+    isFollowing: boolean;
     score: number;
     sharedArtists: number;
     sharedTracks: number;
@@ -111,4 +128,32 @@ export async function updateProfile(
   }
 
   return response.json() as Promise<ProfileResponse>;
+}
+
+export async function followUser(token: string, targetUserId: string) {
+  const response = await fetch(`${apiUrl}/api/follows/${targetUserId}`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`
+    }
+  });
+
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(text || 'Failed to follow user.');
+  }
+}
+
+export async function unfollowUser(token: string, targetUserId: string) {
+  const response = await fetch(`${apiUrl}/api/follows/${targetUserId}`, {
+    method: 'DELETE',
+    headers: {
+      Authorization: `Bearer ${token}`
+    }
+  });
+
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(text || 'Failed to unfollow user.');
+  }
 }

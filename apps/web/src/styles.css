@@ -313,6 +313,26 @@ code {
   gap: 1rem;
 }
 
+.mini-user-card {
+  display: flex;
+  gap: 0.9rem;
+  align-items: center;
+  padding: 0.8rem;
+  border-radius: 18px;
+  background: #f8fbff;
+}
+
+.mini-user-card h3 {
+  margin: 0;
+}
+
+.mini-avatar {
+  width: 52px;
+  height: 52px;
+  border-radius: 14px;
+  object-fit: cover;
+}
+
 .matches-hero {
   display: flex;
   justify-content: space-between;
@@ -371,6 +391,15 @@ code {
 .match-details {
   display: grid;
   gap: 0.8rem;
+}
+
+.match-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.button-secondary {
+  background: #102030;
 }
 
 .list-grid {

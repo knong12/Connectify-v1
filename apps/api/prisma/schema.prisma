@@ -21,9 +21,22 @@ model User {
   spotifyConnected     Boolean             @default(false)
   createdAt            DateTime            @default(now())
   updatedAt            DateTime            @updatedAt
+  following            Follow[]            @relation("UserFollowing")
+  followers            Follow[]            @relation("UserFollowers")
   favoriteGenres       UserFavoriteGenre[]
   favoriteArtists      UserFavoriteArtist[]
   favoriteTracks       UserFavoriteTrack[]
+}
+
+model Follow {
+  id          String   @id @default(uuid())
+  followerId  String
+  followingId String
+  createdAt   DateTime @default(now())
+  follower    User     @relation("UserFollowing", fields: [followerId], references: [id], onDelete: Cascade)
+  following   User     @relation("UserFollowers", fields: [followingId], references: [id], onDelete: Cascade)
+
+  @@unique([followerId, followingId])
 }
 
 model Genre {

@@ -1,5 +1,10 @@
 import { useEffect, useState } from 'react';
-import { fetchMatches, type MatchesResponse } from '../lib/api';
+import {
+  fetchMatches,
+  followUser,
+  type MatchesResponse,
+  unfollowUser
+} from '../lib/api';
 
 const tokenStorageKey = 'connectify_app_token';
 
@@ -19,6 +24,7 @@ function joinPreview(values: string[]) {
 
 export default function MatchesPage() {
   const [state, setState] = useState<MatchLoadState>({ status: 'idle' });
+  const [pendingUserId, setPendingUserId] = useState<string | null>(null);
 
   useEffect(() => {
     const token = getStoredToken();
@@ -78,6 +84,38 @@ export default function MatchesPage() {
     );
   }
 
+  async function handleFollowToggle(targetUserId: string, isFollowing: boolean) {
+    const token = getStoredToken();
+
+    if (!token || state.status !== 'ready') {
+      return;
+    }
+
+    setPendingUserId(targetUserId);
+
+    try {
+      if (isFollowing) {
+        await unfollowUser(token, targetUserId);
+      } else {
+        await followUser(token, targetUserId);
+      }
+
+      setState({
+        status: 'ready',
+        matches: state.matches.map((match) =>
+          match.userId === targetUserId ? { ...match, isFollowing: !isFollowing } : match
+        )
+      });
+    } catch (error) {
+      setState({
+        status: 'error',
+        message: error instanceof Error ? error.message : 'Failed to update follow state.'
+      });
+    } finally {
+      setPendingUserId(null);
+    }
+  }
+
   return (
     <div className="stack">
       <section className="card matches-hero">
@@ -113,6 +151,10 @@ export default function MatchesPage() {
                   <p className="eyebrow">Potential Match</p>
                   <h3>{match.displayName}</h3>
                   <p className="muted">@{match.spotifyUserId}</p>
+                  {match.bio ? <p className="muted">{match.bio}</p> : null}
+                  {match.favoriteArtistNote ? (
+                    <p className="muted">Favorite artist note: {match.favoriteArtistNote}</p>
+                  ) : null}
                 </div>
               </div>
               <div className="score-badge">
@@ -149,6 +191,21 @@ export default function MatchesPage() {
                     : 'No shared tracks yet'}
                 </p>
               </div>
+            </div>
+
+            <div className="match-actions">
+              <button
+                className={match.isFollowing ? 'button button-secondary' : 'button'}
+                disabled={pendingUserId === match.userId}
+                onClick={() => handleFollowToggle(match.userId, match.isFollowing)}
+                type="button"
+              >
+                {pendingUserId === match.userId
+                  ? 'Updating...'
+                  : match.isFollowing
+                    ? 'Following'
+                    : 'Follow'}
+              </button>
             </div>
           </article>
         ))}

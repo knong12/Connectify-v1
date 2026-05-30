@@ -15,6 +15,20 @@ function shapeUserProfile(user: NonNullable<Awaited<ReturnType<typeof getUserPro
     bio: user.bio,
     favoriteArtistNote: user.favoriteArtistNote,
     musicPrompt: user.musicPrompt,
+    followerCount: user.followers.length,
+    followingCount: user.following.length,
+    followers: user.followers.map((entry) => ({
+      id: entry.follower.id,
+      displayName: entry.follower.displayName,
+      spotifyUserId: entry.follower.spotifyUserId,
+      spotifyProfileImage: entry.follower.spotifyProfileImage
+    })),
+    followingUsers: user.following.map((entry) => ({
+      id: entry.following.id,
+      displayName: entry.following.displayName,
+      spotifyUserId: entry.following.spotifyUserId,
+      spotifyProfileImage: entry.following.spotifyProfileImage
+    })),
     createdAt: user.createdAt,
     updatedAt: user.updatedAt,
     favoriteGenres: user.favoriteGenres.map((entry) => ({

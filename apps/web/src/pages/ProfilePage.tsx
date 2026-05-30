@@ -297,8 +297,76 @@ export default function ProfilePage() {
               {new Date(profile.createdAt).toLocaleDateString()}
             </strong>
           </div>
+          <div className="stat">
+            <span className="stat-label">Followers</span>
+            <strong>{profile.followerCount}</strong>
+          </div>
+          <div className="stat">
+            <span className="stat-label">Following</span>
+            <strong>{profile.followingCount}</strong>
+          </div>
         </div>
       </section>
+
+      <div className="profile-grid">
+        <section className="card">
+          <h2>Followers</h2>
+          <div className="list-grid">
+            {profile.followers.length > 0 ? (
+              profile.followers.map((follower) => (
+                <article className="mini-user-card" key={follower.id}>
+                  {follower.spotifyProfileImage ? (
+                    <img
+                      alt={`${follower.displayName} Spotify profile`}
+                      className="mini-avatar"
+                      src={follower.spotifyProfileImage}
+                    />
+                  ) : (
+                    <div className="mini-avatar avatar-fallback">
+                      {follower.displayName.slice(0, 1).toUpperCase()}
+                    </div>
+                  )}
+                  <div>
+                    <h3>{follower.displayName}</h3>
+                    <p className="muted">@{follower.spotifyUserId}</p>
+                  </div>
+                </article>
+              ))
+            ) : (
+              <p className="muted">No followers yet.</p>
+            )}
+          </div>
+        </section>
+
+        <section className="card">
+          <h2>Following</h2>
+          <div className="list-grid">
+            {profile.followingUsers.length > 0 ? (
+              profile.followingUsers.map((followedUser) => (
+                <article className="mini-user-card" key={followedUser.id}>
+                  {followedUser.spotifyProfileImage ? (
+                    <img
+                      alt={`${followedUser.displayName} Spotify profile`}
+                      className="mini-avatar"
+                      src={followedUser.spotifyProfileImage}
+                    />
+                  ) : (
+                    <div className="mini-avatar avatar-fallback">
+                      {followedUser.displayName.slice(0, 1).toUpperCase()}
+                    </div>
+                  )}
+                  <div>
+                    <h3>{followedUser.displayName}</h3>
+                    <p className="muted">@{followedUser.spotifyUserId}</p>
+                  </div>
+                </article>
+              ))
+            ) : (
+              <p className="muted">Not following anyone yet.</p>
+            )}
+          </div>
+        </section>
+      </div>
 
       <div className="profile-grid">
         <section className="card">
