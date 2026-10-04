@@ -8,6 +8,9 @@ const spotifyScopes = [
   'user-top-read'
 ];
 
+const spotifyTimeRanges = ['short_term', 'medium_term', 'long_term'] as const;
+type SpotifyTimeRange = (typeof spotifyTimeRanges)[number];
+
 type SpotifyArtist = {
   id: string;
   name: string;
@@ -39,6 +42,8 @@ type SpotifyClientCredentialsResponse = {
   token_type: string;
   expires_in: number;
 };
+
+type SpotifyTopItemsByRange<T> = Record<SpotifyTimeRange, T[]>;
 
 export function buildSpotifyAuthorizeUrl(state: string) {
   const authUrl = new URL('https://accounts.spotify.com/authorize');
@@ -84,10 +89,17 @@ async function parseSpotifyResponse<T>(response: Response, fallbackMessage: stri
   }
 
   if (!response.ok) {
+    const spotifyObject = data && typeof data === 'object' ? (data as Record<string, unknown>) : null;
+    const nestedError =
+      spotifyObject && spotifyObject.error && typeof spotifyObject.error === 'object'
+        ? (spotifyObject.error as Record<string, unknown>)
+        : null;
     const message =
-      (data && typeof data.error_description === 'string' && data.error_description) ||
-      (data && typeof data.error?.message === 'string' && data.error.message) ||
-      (data && typeof data.error === 'string' && data.error) ||
+      (spotifyObject &&
+        typeof spotifyObject.error_description === 'string' &&
+        spotifyObject.error_description) ||
+      (nestedError && typeof nestedError.message === 'string' && nestedError.message) ||
+      (spotifyObject && typeof spotifyObject.error === 'string' && spotifyObject.error) ||
       fallbackMessage;
 
     const error = new Error(message) as Error & {
@@ -230,23 +242,48 @@ export async function fetchSpotifyProfile(accessToken: string): Promise<SpotifyP
 }
 
 export async function syncTopMusicData(userId: string, accessToken: string): Promise<void> {
-  const [artistsResponse, tracksResponse] = await Promise.all([
-    fetchSpotifyResource<SpotifyPagingResponse<SpotifyArtist>>(
-      accessToken,
-      'https://api.spotify.com/v1/me/top/artists?limit=10&time_range=medium_term',
-      'Spotify top artists fetch failed.'
-    ),
-    fetchSpotifyResource<SpotifyPagingResponse<SpotifyTrack>>(
-      accessToken,
-      'https://api.spotify.com/v1/me/top/tracks?limit=10&time_range=medium_term',
-      'Spotify top tracks fetch failed.'
-    )
-  ]);
+  const artistResponses = await Promise.all(
+    spotifyTimeRanges.map(async (timeRange) => ({
+      timeRange,
+      response: await fetchSpotifyResource<SpotifyPagingResponse<SpotifyArtist>>(
+        accessToken,
+        `https://api.spotify.com/v1/me/top/artists?limit=10&time_range=${timeRange}`,
+        `Spotify top artists fetch failed for ${timeRange}.`
+      )
+    }))
+  );
 
-  const topArtists = artistsResponse.items;
+  const trackResponses = await Promise.all(
+    spotifyTimeRanges.map(async (timeRange) => ({
+      timeRange,
+      response: await fetchSpotifyResource<SpotifyPagingResponse<SpotifyTrack>>(
+        accessToken,
+        `https://api.spotify.com/v1/me/top/tracks?limit=10&time_range=${timeRange}`,
+        `Spotify top tracks fetch failed for ${timeRange}.`
+      )
+    }))
+  );
+
+  const topArtistsByRange = artistResponses.reduce(
+    (accumulator, entry) => {
+      accumulator[entry.timeRange] = entry.response.items;
+      return accumulator;
+    },
+    {} as SpotifyTopItemsByRange<SpotifyArtist>
+  );
+
+  const topTracksByRange = trackResponses.reduce(
+    (accumulator, entry) => {
+      accumulator[entry.timeRange] = entry.response.items;
+      return accumulator;
+    },
+    {} as SpotifyTopItemsByRange<SpotifyTrack>
+  );
+
+  const mediumTermArtists = topArtistsByRange.medium_term;
   console.log(
     '[spotify sync] top artists raw genres:',
-    topArtists.map((artist) => ({
+    mediumTermArtists.map((artist) => ({
       id: artist.id,
       name: artist.name,
       genres: artist.genres ?? []
@@ -257,9 +294,16 @@ export async function syncTopMusicData(userId: string, accessToken: string): Pro
 
   try {
     const appAccessToken = await fetchSpotifyAppAccessToken();
+    const uniqueArtistIds = [
+      ...new Set(
+        Object.values(topArtistsByRange)
+          .flat()
+          .map((artist) => artist.id)
+      )
+    ];
     fullArtists = await fetchArtistsByIds(
       appAccessToken,
-      topArtists.map((artist) => artist.id)
+      uniqueArtistIds
     );
   } catch (error) {
     const enrichedError = error as Error & {
@@ -277,7 +321,7 @@ export async function syncTopMusicData(userId: string, accessToken: string): Pro
   }
 
   const fullArtistsById = new Map(fullArtists.map((artist) => [artist.id, artist]));
-  const normalizedArtists = topArtists.map((artist) => {
+  const normalizeArtist = (artist: SpotifyArtist) => {
     const fullArtist = fullArtistsById.get(artist.id);
 
     return {
@@ -285,18 +329,42 @@ export async function syncTopMusicData(userId: string, accessToken: string): Pro
       genres: fullArtist?.genres ?? artist.genres ?? [],
       images: fullArtist?.images ?? artist.images ?? []
     };
-  });
+  };
+
+  const normalizedArtistsByRange = spotifyTimeRanges.reduce(
+    (accumulator, timeRange) => {
+      accumulator[timeRange] = topArtistsByRange[timeRange].map(normalizeArtist);
+      return accumulator;
+    },
+    {} as SpotifyTopItemsByRange<SpotifyArtist>
+  );
+
   console.log(
     '[spotify sync] normalized artist genres:',
-    normalizedArtists.map((artist) => ({
+    normalizedArtistsByRange.medium_term.map((artist) => ({
       id: artist.id,
       name: artist.name,
       genres: artist.genres ?? []
     }))
   );
-  const topTracks = tracksResponse.items;
-  const topGenres = deriveTopGenres(normalizedArtists);
+  const topGenres = deriveTopGenres(normalizedArtistsByRange.medium_term);
   console.log('[spotify sync] derived top genres:', topGenres);
+
+  const uniqueNormalizedArtists = [
+    ...new Map(
+      Object.values(normalizedArtistsByRange)
+        .flat()
+        .map((artist) => [artist.id, artist])
+    ).values()
+  ];
+
+  const uniqueTracks = [
+    ...new Map(
+      Object.values(topTracksByRange)
+        .flat()
+        .map((track) => [track.id, track])
+    ).values()
+  ];
 
   await prisma.$transaction(async (tx) => {
     await tx.userFavoriteGenre.deleteMany({ where: { userId } });
@@ -311,7 +379,7 @@ export async function syncTopMusicData(userId: string, accessToken: string): Pro
       });
     }
 
-    for (const artist of normalizedArtists) {
+    for (const artist of uniqueNormalizedArtists) {
       await tx.artist.upsert({
         where: { spotifyId: artist.id },
         update: {
@@ -328,7 +396,7 @@ export async function syncTopMusicData(userId: string, accessToken: string): Pro
       });
     }
 
-    for (const track of topTracks) {
+    for (const track of uniqueTracks) {
       await tx.track.upsert({
         where: { spotifyId: track.id },
         update: {
@@ -363,32 +431,36 @@ export async function syncTopMusicData(userId: string, accessToken: string): Pro
       });
     }
 
-    for (const [index, artist] of normalizedArtists.entries()) {
-      const savedArtist = await tx.artist.findUniqueOrThrow({
-        where: { spotifyId: artist.id }
-      });
+    for (const timeRange of spotifyTimeRanges) {
+      for (const [index, artist] of normalizedArtistsByRange[timeRange].entries()) {
+        const savedArtist = await tx.artist.findUniqueOrThrow({
+          where: { spotifyId: artist.id }
+        });
 
-      await tx.userFavoriteArtist.create({
-        data: {
-          userId,
-          artistId: savedArtist.id,
-          rank: index + 1
-        }
-      });
-    }
+        await tx.userFavoriteArtist.create({
+          data: {
+            userId,
+            artistId: savedArtist.id,
+            rank: index + 1,
+            timeRange
+          }
+        });
+      }
 
-    for (const [index, track] of topTracks.entries()) {
-      const savedTrack = await tx.track.findUniqueOrThrow({
-        where: { spotifyId: track.id }
-      });
+      for (const [index, track] of topTracksByRange[timeRange].entries()) {
+        const savedTrack = await tx.track.findUniqueOrThrow({
+          where: { spotifyId: track.id }
+        });
 
-      await tx.userFavoriteTrack.create({
-        data: {
-          userId,
-          trackId: savedTrack.id,
-          rank: index + 1
-        }
-      });
+        await tx.userFavoriteTrack.create({
+          data: {
+            userId,
+            trackId: savedTrack.id,
+            rank: index + 1,
+            timeRange
+          }
+        });
+      }
     }
   });
 }

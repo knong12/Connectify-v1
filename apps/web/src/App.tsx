@@ -8,8 +8,7 @@ export default function App() {
     <div className="app-shell">
       <header className="topbar">
         <div>
-          <p className="eyebrow">Connectify v2</p>
-          <h1>Spotify-powered friend matching, Welcome.</h1>
+          <h1>Connectify</h1>
         </div>
         <nav className="nav">
           <NavLink to="/">Home</NavLink>
@@ -21,10 +20,10 @@ export default function App() {
         <Routes>
           <Route path="/" element={<HomePage />} />
           <Route path="/profile" element={<ProfilePage />} />
+          <Route path="/profile/:userId" element={<ProfilePage />} />
           <Route path="/matches" element={<MatchesPage />} />
         </Routes>
       </main>
     </div>
   );
 }
-

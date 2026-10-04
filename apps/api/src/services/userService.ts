@@ -22,11 +22,11 @@ export async function getUserProfileById(userId: string) {
       },
       favoriteArtists: {
         include: { artist: true },
-        orderBy: { rank: 'asc' }
+        orderBy: [{ timeRange: 'asc' }, { rank: 'asc' }]
       },
       favoriteTracks: {
         include: { track: true },
-        orderBy: { rank: 'asc' }
+        orderBy: [{ timeRange: 'asc' }, { rank: 'asc' }]
       }
     }
   });

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import {
   fetchMatches,
   followUser,
@@ -19,7 +20,35 @@ function getStoredToken() {
 }
 
 function joinPreview(values: string[]) {
-  return values.filter(Boolean).join(' • ');
+  return values.filter(Boolean).join(', ');
+}
+
+function getMatchTier(score: number) {
+  if (score >= 70) {
+    return 'Strong overlap';
+  }
+
+  if (score >= 40) {
+    return 'Worth exploring';
+  }
+
+  return 'Early discovery';
+}
+
+function getMatchExplanation(match: MatchesResponse['matches'][number]) {
+  if (match.sharedArtists > 0 && match.sharedTracks > 0) {
+    return `You already overlap on ${match.sharedArtists} artist${match.sharedArtists === 1 ? '' : 's'} and ${match.sharedTracks} track${match.sharedTracks === 1 ? '' : 's'}.`;
+  }
+
+  if (match.sharedArtists > 0) {
+    return `This recommendation is being driven mostly by artist taste, with ${match.sharedArtists} shared favorite artist${match.sharedArtists === 1 ? '' : 's'}.`;
+  }
+
+  if (match.sharedTracks > 0) {
+    return `This card is showing up because you both saved ${match.sharedTracks} of the same track${match.sharedTracks === 1 ? '' : 's'}.`;
+  }
+
+  return 'There is no direct overlap yet, but this person is still being surfaced as a discovery candidate for the current demo.';
 }
 
 export default function MatchesPage() {
@@ -119,96 +148,125 @@ export default function MatchesPage() {
   return (
     <div className="stack">
       <section className="card matches-hero">
-        <div>
+        <div className="matches-hero-copy">
           <p className="eyebrow">Compatibility View</p>
-          <h2>Music overlap matches</h2>
+          <h2>People with a similar listening profile</h2>
           <p>
-            Current Test / Demo of Compatability Score and Results
+            Connectify compares your saved artists and tracks, then surfaces people who feel
+            closest to your current music identity.
           </p>
         </div>
         <div className="pill-row">
           <span className="pill">Artist overlap</span>
           <span className="pill">Track overlap</span>
+          <span className="pill">Follow suggestions</span>
           <span className="pill pill-success">Ranked results</span>
         </div>
       </section>
 
       <section className="matches-grid">
-        {state.matches.map((match) => (
-          <article className="card match-card" key={match.userId}>
-            <div className="match-header">
-              <div className="match-identity">
-                {match.spotifyProfileImage ? (
-                  <img
-                    alt={`${match.displayName} Spotify profile`}
-                    className="avatar"
-                    src={match.spotifyProfileImage}
-                  />
-                ) : (
-                  <div className="avatar avatar-fallback">{match.displayName.slice(0, 1)}</div>
-                )}
-                <div>
-                  <p className="eyebrow">Potential Match</p>
-                  <h3>{match.displayName}</h3>
-                  <p className="muted">@{match.spotifyUserId}</p>
-                  {match.bio ? <p className="muted">{match.bio}</p> : null}
-                  {match.favoriteArtistNote ? (
-                    <p className="muted">Favorite artist note: {match.favoriteArtistNote}</p>
-                  ) : null}
+        {state.matches.map((match) => {
+          const tier = getMatchTier(match.score);
+          const explanation = getMatchExplanation(match);
+
+          return (
+            <article className="card match-card" key={match.userId}>
+              <div className="match-header">
+                <div className="match-identity">
+                  {match.spotifyProfileImage ? (
+                    <img
+                      alt={`${match.displayName} Spotify profile`}
+                      className="avatar"
+                      src={match.spotifyProfileImage}
+                    />
+                  ) : (
+                    <div className="avatar avatar-fallback">{match.displayName.slice(0, 1)}</div>
+                  )}
+                  <div>
+                    <p className="eyebrow">Potential Match</p>
+                    <h3>{match.displayName}</h3>
+                    <div className="pill-row match-meta-row">
+                      <span className="pill">{tier}</span>
+                      {match.isFollowing ? (
+                        <span className="pill pill-success">Following</span>
+                      ) : null}
+                    </div>
+                  </div>
+                </div>
+                <div className="score-badge">
+                  <span>Score</span>
+                  <strong>{match.score}</strong>
                 </div>
               </div>
-              <div className="score-badge">
-                <span>Score</span>
-                <strong>{match.score}</strong>
-              </div>
-            </div>
 
-            <div className="stats-grid">
-              <div className="stat">
-                <span className="stat-label">Shared Artists</span>
-                <strong>{match.sharedArtists}</strong>
+              <div className="match-story">
+                <p className="match-story-lead">Why this match appeared</p>
+                <p className="muted">{explanation}</p>
               </div>
-              <div className="stat">
-                <span className="stat-label">Shared Tracks</span>
-                <strong>{match.sharedTracks}</strong>
-              </div>
-            </div>
 
-            <div className="match-details">
-              <div>
-                <p className="eyebrow">Artist Overlap</p>
-                <p className="muted">
-                  {match.sharedArtistNames.length > 0
-                    ? joinPreview(match.sharedArtistNames)
-                    : 'No shared artists yet'}
-                </p>
+              <div className="match-stats-grid">
+                <div className="stat">
+                  <span className="stat-label">Shared Artists</span>
+                  <strong>{match.sharedArtists}</strong>
+                </div>
+                <div className="stat">
+                  <span className="stat-label">Shared Tracks</span>
+                  <strong>{match.sharedTracks}</strong>
+                </div>
               </div>
-              <div>
-                <p className="eyebrow">Track Overlap</p>
-                <p className="muted">
-                  {match.sharedTrackNames.length > 0
-                    ? joinPreview(match.sharedTrackNames)
-                    : 'No shared tracks yet'}
-                </p>
-              </div>
-            </div>
 
-            <div className="match-actions">
-              <button
-                className={match.isFollowing ? 'button button-secondary' : 'button'}
-                disabled={pendingUserId === match.userId}
-                onClick={() => handleFollowToggle(match.userId, match.isFollowing)}
-                type="button"
-              >
-                {pendingUserId === match.userId
-                  ? 'Updating...'
-                  : match.isFollowing
-                    ? 'Following'
-                    : 'Follow'}
-              </button>
-            </div>
-          </article>
-        ))}
+              <div className="match-social-block">
+                {match.bio ? <p className="match-bio">{match.bio}</p> : null}
+                {match.favoriteArtistNote ? (
+                  <p className="match-note">
+                    <span>Favorite artist highlight:</span> {match.favoriteArtistNote}
+                  </p>
+                ) : (
+                  <p className="match-note match-note-muted">
+                    No profile note added yet, so this card is leaning fully on music overlap.
+                  </p>
+                )}
+              </div>
+
+              <div className="match-details">
+                <div className="match-detail-panel">
+                  <p className="eyebrow">Artist Overlap</p>
+                  <p className="muted">
+                    {match.sharedArtistNames.length > 0
+                      ? joinPreview(match.sharedArtistNames)
+                      : 'No shared artists yet'}
+                  </p>
+                </div>
+                <div className="match-detail-panel">
+                  <p className="eyebrow">Track Overlap</p>
+                  <p className="muted">
+                    {match.sharedTrackNames.length > 0
+                      ? joinPreview(match.sharedTrackNames)
+                      : 'No shared tracks yet'}
+                  </p>
+                </div>
+              </div>
+
+              <div className="match-actions">
+                <Link className="button button-ghost" to={`/profile/${match.userId}`}>
+                  View profile
+                </Link>
+                <button
+                  className={match.isFollowing ? 'button button-secondary' : 'button'}
+                  disabled={pendingUserId === match.userId}
+                  onClick={() => handleFollowToggle(match.userId, match.isFollowing)}
+                  type="button"
+                >
+                  {pendingUserId === match.userId
+                    ? 'Updating...'
+                    : match.isFollowing
+                      ? 'Following'
+                      : 'Follow'}
+                </button>
+              </div>
+            </article>
+          );
+        })}
       </section>
     </div>
   );

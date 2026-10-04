@@ -7,6 +7,12 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum SpotifyTimeRange {
+  short_term
+  medium_term
+  long_term
+}
+
 model User {
   id                   String              @id @default(uuid())
   email                String              @unique
@@ -89,12 +95,13 @@ model UserFavoriteArtist {
   userId    String
   artistId  String
   rank      Int
+  timeRange SpotifyTimeRange @default(medium_term)
   createdAt DateTime @default(now())
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   artist    Artist   @relation(fields: [artistId], references: [id], onDelete: Cascade)
 
-  @@unique([userId, artistId])
-  @@unique([userId, rank])
+  @@unique([userId, artistId, timeRange])
+  @@unique([userId, rank, timeRange])
 }
 
 model UserFavoriteTrack {
@@ -102,10 +109,11 @@ model UserFavoriteTrack {
   userId    String
   trackId   String
   rank      Int
+  timeRange SpotifyTimeRange @default(medium_term)
   createdAt DateTime @default(now())
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   track     Track    @relation(fields: [trackId], references: [id], onDelete: Cascade)
 
-  @@unique([userId, trackId])
-  @@unique([userId, rank])
+  @@unique([userId, trackId, timeRange])
+  @@unique([userId, rank, timeRange])
 }

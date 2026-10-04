@@ -6,6 +6,7 @@ import followRoutes from './routes/follows.js';
 import healthRoutes from './routes/health.js';
 import matchesRoutes from './routes/matches.js';
 import meRoutes from './routes/me.js';
+import usersRoutes from './routes/users.js';
 
 const app = express();
 
@@ -22,6 +23,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/follows', followRoutes);
 app.use('/api/me', meRoutes);
 app.use('/api/matches', matchesRoutes);
+app.use('/api/users', usersRoutes);
 
 app.use((error: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
   res.status(500).json({

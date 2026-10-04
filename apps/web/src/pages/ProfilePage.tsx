@@ -1,7 +1,19 @@
 import { useEffect, useState } from 'react';
-import { fetchProfile, type ProfileResponse, updateProfile } from '../lib/api';
+import { Link, useParams } from 'react-router-dom';
+import {
+  fetchProfile,
+  fetchUserProfile,
+  type ProfileResponse,
+  type SpotifyTimeRange,
+  updateProfile
+} from '../lib/api';
 
 const tokenStorageKey = 'connectify_app_token';
+const timeRangeLabels: Record<SpotifyTimeRange, string> = {
+  short_term: 'Recent',
+  medium_term: '6 Months',
+  long_term: '1 Year'
+};
 
 type LoadState =
   | { status: 'idle' }
@@ -35,10 +47,11 @@ function getStoredToken() {
 }
 
 function formatJoinedNames(values: string[]) {
-  return values.filter(Boolean).join(' • ');
+  return values.filter(Boolean).join(', ');
 }
 
 export default function ProfilePage() {
+  const { userId: routeUserId } = useParams();
   const [state, setState] = useState<LoadState>({ status: 'idle' });
   const [form, setForm] = useState<ProfileFormState>({
     bio: '',
@@ -49,6 +62,8 @@ export default function ProfilePage() {
     status: 'idle' | 'saving' | 'saved' | 'error';
     message?: string;
   }>({ status: 'idle' });
+  const [activeTimeRange, setActiveTimeRange] = useState<SpotifyTimeRange>('medium_term');
+  const isViewingOtherProfile = Boolean(routeUserId);
 
   useEffect(() => {
     const token = saveTokenFromUrl() ?? getStoredToken();
@@ -63,7 +78,9 @@ export default function ProfilePage() {
 
     setState({ status: 'loading' });
 
-    fetchProfile(token)
+    const profileRequest = routeUserId ? fetchUserProfile(token, routeUserId) : fetchProfile(token);
+
+    profileRequest
       .then((data) => {
         setForm({
           bio: data.user.bio ?? '',
@@ -81,7 +98,7 @@ export default function ProfilePage() {
           message: error instanceof Error ? error.message : 'Failed to load profile.'
         });
       });
-  }, []);
+  }, [routeUserId]);
 
   if (state.status === 'idle' || state.status === 'loading') {
     return (
@@ -103,6 +120,8 @@ export default function ProfilePage() {
 
   const { profile } = state;
   const topGenreLabels = profile.favoriteGenres.map((genre) => genre.label).slice(0, 5);
+  const displayedArtists = profile.favoriteArtistsByRange[activeTimeRange] ?? [];
+  const displayedTracks = profile.favoriteTracksByRange[activeTimeRange] ?? [];
 
   async function handleProfileSave(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -160,23 +179,28 @@ export default function ProfilePage() {
           <div className="profile-copy">
             <p className="eyebrow">Synced Profile</p>
             <h2>{profile.displayName}</h2>
-            <p className="muted muted-handle">@{profile.spotifyUserId}</p>
             <p className="profile-description">
-              Profile currently displays top 10 songs and top 10 artists
+              {isViewingOtherProfile
+                ? `${profile.displayName}'s page blends synced Spotify favorites with personal notes so you can understand their music taste faster.`
+                : ''}
             </p>
             {profile.bio ? <p className="profile-bio">{profile.bio}</p> : null}
             <div className="pill-row">
-              <span className="pill pill-success">Spotify Connected</span>
-              <span className="pill">Top {profile.favoriteArtists.length} Artists</span>
-              <span className="pill">Top {profile.favoriteTracks.length} Tracks</span>
+              <span className="pill pill-success">
+                {isViewingOtherProfile ? 'Shared profile view' : 'Spotify Connected'}
+              </span>
+              <span className="pill">{timeRangeLabels[activeTimeRange]} artists: {displayedArtists.length}</span>
+              <span className="pill">{timeRangeLabels[activeTimeRange]} tracks: {displayedTracks.length}</span>
             </div>
           </div>
         </div>
         <div className="profile-sidecard">
           <p className="eyebrow">Quick Read</p>
-          <h3>Your taste profile</h3>
+          <h3>{isViewingOtherProfile ? `${profile.displayName}'s taste profile` : 'Your taste profile'}</h3>
           <p className="muted">
-            Right now this profile shows your synced music and artists
+            {isViewingOtherProfile
+              ? 'What defines me?'
+              : 'What defines you?'}
           </p>
           {topGenreLabels.length > 0 ? (
             <div className="tag-cloud">
@@ -188,7 +212,7 @@ export default function ProfilePage() {
             </div>
           ) : (
             <p className="muted">
-              Great Taste!
+              
             </p>
           )}
           {profile.favoriteArtistNote ? (
@@ -206,78 +230,102 @@ export default function ProfilePage() {
         </div>
       </section>
 
-      <section className="card">
-        <div className="section-heading">
-          <div>
-            <p className="eyebrow">Profile Customization</p>
-            <h2>Make the profile more social</h2>
+      {isViewingOtherProfile ? (
+        <section className="card">
+          <div className="section-heading">
+            <div>
+              <p className="eyebrow">Shared Profile View</p>
+              <h2>Back to your own profile when you are ready</h2>
+            </div>
           </div>
-          {saveState.status === 'saved' ? (
-            <span className="pill pill-success">Saved</span>
-          ) : null}
-        </div>
-
-        <form className="profile-form" onSubmit={handleProfileSave}>
-          <label className="field">
-            <span className="field-label">Short bio</span>
-            <textarea
-              maxLength={240}
-              onChange={(event) =>
-                setForm((current) => ({ ...current, bio: event.target.value }))
-              }
-              placeholder="Say a little bit about your music taste."
-              rows={4}
-              value={form.bio}
-            />
-          </label>
-
-          <div className="form-grid">
-            <label className="field">
-              <span className="field-label">Favorite artist highlight</span>
-              <input
-                maxLength={120}
-                onChange={(event) =>
-                  setForm((current) => ({
-                    ...current,
-                    favoriteArtistNote: event.target.value
-                  }))
-                }
-                placeholder="Who always makes it into your rotation?"
-                type="text"
-                value={form.favoriteArtistNote}
-              />
-            </label>
-
-            <label className="field">
-              <span className="field-label">Music prompt</span>
-              <input
-                maxLength={180}
-                onChange={(event) =>
-                  setForm((current) => ({
-                    ...current,
-                    musicPrompt: event.target.value
-                  }))
-                }
-                placeholder="A perfect late-night album is..."
-                type="text"
-                value={form.musicPrompt}
-              />
-            </label>
-          </div>
-
-          <div className="form-actions">
-            <button className="button" disabled={saveState.status === 'saving'} type="submit">
-              {saveState.status === 'saving' ? 'Saving...' : 'Save profile'}
-            </button>
-            {saveState.status === 'error' ? (
-              <p className="muted">{saveState.message}</p>
+          <p className="section-intro">
+            You are currently viewing another Connectify profile in read-only mode.
+          </p>
+          <Link className="button button-ghost" to="/profile">
+            Return to my profile
+          </Link>
+        </section>
+      ) : (
+        <section className="card">
+          <div className="section-heading">
+            <div>
+              <p className="eyebrow">Profile Customization</p>
+              <h2>Make your profile feel personal</h2>
+            </div>
+            {saveState.status === 'saved' ? (
+              <span className="pill pill-success">Saved</span>
             ) : null}
           </div>
-        </form>
-      </section>
+
+          <p className="section-intro">
+            Add a short read on your taste so your matches get more context than just a score.
+          </p>
+
+          <form className="profile-form" onSubmit={handleProfileSave}>
+            <label className="field">
+              <span className="field-label">Short bio</span>
+              <textarea
+                maxLength={240}
+                onChange={(event) =>
+                  setForm((current) => ({ ...current, bio: event.target.value }))
+                }
+                placeholder="Say a little bit about your music taste."
+                rows={4}
+                value={form.bio}
+              />
+            </label>
+
+            <div className="form-grid">
+              <label className="field">
+                <span className="field-label">Favorite artist highlight</span>
+                <input
+                  maxLength={120}
+                  onChange={(event) =>
+                    setForm((current) => ({
+                      ...current,
+                      favoriteArtistNote: event.target.value
+                    }))
+                  }
+                  placeholder="Who always makes it into your rotation?"
+                  type="text"
+                  value={form.favoriteArtistNote}
+                />
+              </label>
+
+              <label className="field">
+                <span className="field-label">Music prompt</span>
+                <input
+                  maxLength={180}
+                  onChange={(event) =>
+                    setForm((current) => ({
+                      ...current,
+                      musicPrompt: event.target.value
+                    }))
+                  }
+                  placeholder="A perfect late-night album is..."
+                  type="text"
+                  value={form.musicPrompt}
+                />
+              </label>
+            </div>
+
+            <div className="form-actions">
+              <button className="button" disabled={saveState.status === 'saving'} type="submit">
+                {saveState.status === 'saving' ? 'Saving...' : 'Save profile'}
+              </button>
+              {saveState.status === 'error' ? (
+                <p className="muted">{saveState.message}</p>
+              ) : null}
+            </div>
+          </form>
+        </section>
+      )}
 
       <section className="card">
         <h2>Profile Snapshot</h2>
+        <p className="section-intro">
+          A quick read on how much music data and social activity is tied to your account right now.
+        </p>
         <div className="stats-grid">
           <div className="stat">
             <span className="stat-label">Top Artists</span>
@@ -311,6 +359,7 @@ export default function ProfilePage() {
       <div className="profile-grid">
         <section className="card">
           <h2>Followers</h2>
+          <p className="section-intro">You got fans.</p>
           <div className="list-grid">
             {profile.followers.length > 0 ? (
               profile.followers.map((follower) => (
@@ -328,7 +377,6 @@ export default function ProfilePage() {
                   )}
                   <div>
                     <h3>{follower.displayName}</h3>
-                    <p className="muted">@{follower.spotifyUserId}</p>
                   </div>
                 </article>
               ))
@@ -340,6 +388,7 @@ export default function ProfilePage() {
 
         <section className="card">
           <h2>Following</h2>
+          <p className="section-intro">Keep that following count low.</p>
           <div className="list-grid">
             {profile.followingUsers.length > 0 ? (
               profile.followingUsers.map((followedUser) => (
@@ -357,7 +406,6 @@ export default function ProfilePage() {
                   )}
                   <div>
                     <h3>{followedUser.displayName}</h3>
-                    <p className="muted">@{followedUser.spotifyUserId}</p>
                   </div>
                 </article>
               ))
@@ -371,8 +419,23 @@ export default function ProfilePage() {
       <div className="profile-grid">
         <section className="card">
           <h2>Top Artists</h2>
+          <p className="section-intro">
+            Switch between Spotify time windows to see how your artist identity changes over time.
+          </p>
+          <div className="time-range-tabs" role="tablist" aria-label="Artist time range">
+            {Object.entries(timeRangeLabels).map(([timeRange, label]) => (
+              <button
+                key={timeRange}
+                className={timeRange === activeTimeRange ? 'tab-button active' : 'tab-button'}
+                onClick={() => setActiveTimeRange(timeRange as SpotifyTimeRange)}
+                type="button"
+              >
+                {label}
+              </button>
+            ))}
+          </div>
           <div className="list-grid">
-            {profile.favoriteArtists.map((artist) => (
+            {displayedArtists.map((artist) => (
               <article className="music-card" key={artist.id}>
                 {artist.imageUrl ? (
                   <img alt={artist.name} className="cover-art" src={artist.imageUrl} />
@@ -385,7 +448,7 @@ export default function ProfilePage() {
                   {artist.genres.length > 0 ? (
                     <p className="muted">{formatJoinedNames(artist.genres.slice(0, 3))}</p>
                   ) : (
-                    <p className="muted">default</p>
+                    <p className="muted">Genre labels Place Holder</p>
                   )}
                 </div>
               </article>
@@ -395,8 +458,11 @@ export default function ProfilePage() {
 
         <section className="card">
           <h2>Top Tracks</h2>
+          <p className="section-intro">
+            The same time-window view applies here so users can compare recent and longer-term songs.
+          </p>
           <div className="list-grid">
-            {profile.favoriteTracks.map((track) => (
+            {displayedTracks.map((track) => (
               <article className="music-card" key={track.id}>
                 {track.albumArt ? (
                   <img alt={track.name} className="cover-art" src={track.albumArt} />

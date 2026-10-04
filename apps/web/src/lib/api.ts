@@ -1,5 +1,27 @@
 const apiUrl = import.meta.env.VITE_API_URL || '';
 
+export type SpotifyTimeRange = 'short_term' | 'medium_term' | 'long_term';
+
+type FavoriteArtist = {
+  id: string;
+  spotifyId: string;
+  name: string;
+  imageUrl: string | null;
+  genres: string[];
+  rank: number;
+};
+
+type FavoriteTrack = {
+  id: string;
+  spotifyId: string;
+  name: string;
+  artistName: string;
+  albumName: string | null;
+  albumArt: string | null;
+  previewUrl: string | null;
+  rank: number;
+};
+
 export type ProfileResponse = {
   user: {
     id: string;
@@ -33,24 +55,10 @@ export type ProfileResponse = {
       label: string;
       rank: number;
     }[];
-    favoriteArtists: {
-      id: string;
-      spotifyId: string;
-      name: string;
-      imageUrl: string | null;
-      genres: string[];
-      rank: number;
-    }[];
-    favoriteTracks: {
-      id: string;
-      spotifyId: string;
-      name: string;
-      artistName: string;
-      albumName: string | null;
-      albumArt: string | null;
-      previewUrl: string | null;
-      rank: number;
-    }[];
+    favoriteArtists: FavoriteArtist[];
+    favoriteTracks: FavoriteTrack[];
+    favoriteArtistsByRange: Record<SpotifyTimeRange, FavoriteArtist[]>;
+    favoriteTracksByRange: Record<SpotifyTimeRange, FavoriteTrack[]>;
   };
 };
 
@@ -85,6 +93,21 @@ export async function fetchProfile(token: string) {
   if (!response.ok) {
     const text = await response.text();
     throw new Error(text || 'Failed to load profile.');
+  }
+
+  return response.json() as Promise<ProfileResponse>;
+}
+
+export async function fetchUserProfile(token: string, userId: string) {
+  const response = await fetch(`${apiUrl}/api/users/${userId}`, {
+    headers: {
+      Authorization: `Bearer ${token}`
+    }
+  });
+
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(text || 'Failed to load user profile.');
   }
 
   return response.json() as Promise<ProfileResponse>;
