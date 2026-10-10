@@ -459,7 +459,7 @@ export default function ProfilePage() {
         <section className="card">
           <h2>Top Tracks</h2>
           <p className="section-intro">
-            The same time-window view applies here so users can compare recent and longer-term songs.
+            Here are your top tracks.
           </p>
           <div className="list-grid">
             {displayedTracks.map((track) => (

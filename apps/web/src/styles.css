@@ -55,10 +55,18 @@ code {
   flex-wrap: wrap;
 }
 
-.nav a {
+.nav a,
+.nav .logout-button {
   padding: 0.5rem 0.8rem;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.7);
+}
+
+.nav .logout-button {
+  border: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
 }
 
 .nav a.active {
