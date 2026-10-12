@@ -1,10 +1,28 @@
 import { getApiUrl } from '../lib/api';
+import { useSearchParams } from 'react-router-dom';
 
 const apiUrl = getApiUrl();
 
+const authMessages: Record<string, string> = {
+  invalid_state: 'Your login attempt expired or could not be verified. Please start Spotify login again.',
+  cancelled: 'Spotify login was cancelled. You can try again when you are ready.',
+  missing_code: 'Spotify did not complete the login. Please try again.',
+  reconnect: 'Your Spotify authorization expired. Please sign in again.',
+  rate_limited: 'Spotify is receiving too many requests. Please wait a while before trying again.',
+  access_denied: 'Spotify denied access. Check that your account is allowed to use this app.',
+  unavailable: 'Could not reach Spotify. Please try again shortly.',
+  login_failed: 'Could not complete login or music synchronization. Please try again.'
+};
+
 export default function HomePage() {
+  const [searchParams] = useSearchParams();
+  const authError = searchParams.get('authError');
+  const authMessage = authError && Object.prototype.hasOwnProperty.call(authMessages, authError)
+    ? authMessages[authError]
+    : authMessages.login_failed;
   return (
     <div className="stack">
+      {authError ? <p role="alert">{authMessage}</p> : null}
       <section className="hero home-hero">
         <div className="home-hero-copy">
           <p className="eyebrow">Connect Through Music</p>

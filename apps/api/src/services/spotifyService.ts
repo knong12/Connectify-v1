@@ -45,6 +45,44 @@ type SpotifyClientCredentialsResponse = {
 
 type SpotifyTopItemsByRange<T> = Record<SpotifyTimeRange, T[]>;
 
+export class SpotifyRequestError extends Error {
+  constructor(
+    public readonly code: string,
+    public readonly status?: number,
+    public readonly retryAfter?: number
+  ) {
+    super(code);
+  }
+}
+
+export function getSpotifyFailure(error: unknown) {
+  if (error instanceof SpotifyRequestError) {
+    if (error.status === 429) return { code: 'rate_limited', status: 429 };
+    if (error.status === 401 || error.code === 'invalid_grant' || error.code === 'reconnect') {
+      return { code: 'reconnect', status: 401 };
+    }
+    if (error.status === 403) return { code: 'access_denied', status: 403 };
+    if (error.code === 'timeout' || error.code === 'network') {
+      return { code: 'unavailable', status: 503 };
+    }
+  }
+  return { code: 'login_failed', status: 500 };
+}
+
+async function requestSpotify(url: string, options: RequestInit = {}) {
+  try {
+    const response = await fetch(url, { ...options, signal: AbortSignal.timeout(15000) });
+    const text = await response.text();
+    return new Response(text || null, {
+      status: response.status,
+      headers: response.headers
+    });
+  } catch (error) {
+    const name = error instanceof Error ? error.name : '';
+    throw new SpotifyRequestError(name === 'TimeoutError' || name === 'AbortError' ? 'timeout' : 'network');
+  }
+}
+
 export function buildSpotifyAuthorizeUrl(state: string) {
   const authUrl = new URL('https://accounts.spotify.com/authorize');
   authUrl.searchParams.set('client_id', env.SPOTIFY_CLIENT_ID);
@@ -56,7 +94,7 @@ export function buildSpotifyAuthorizeUrl(state: string) {
   return authUrl.toString();
 }
 
-async function parseSpotifyResponse<T>(response: Response, fallbackMessage: string): Promise<T> {
+async function parseSpotifyResponse<T>(response: Response, _fallbackMessage: string): Promise<T> {
   const text = await response.text();
   let data: unknown = null;
 
@@ -64,58 +102,25 @@ async function parseSpotifyResponse<T>(response: Response, fallbackMessage: stri
     try {
       data = JSON.parse(text);
     } catch {
-      if (!response.ok) {
-        const error = new Error(
-          `${fallbackMessage} Response was not valid JSON: ${text.slice(0, 160)}`
-        ) as Error & {
-          status?: number;
-          spotifyBody?: unknown;
-        };
-        error.status = response.status;
-        error.spotifyBody = text;
-        throw error;
-      }
-
-      const error = new Error(
-        `Spotify returned a non-JSON success response: ${text.slice(0, 160)}`
-      ) as Error & {
-        status?: number;
-        spotifyBody?: unknown;
-      };
-      error.status = response.status;
-      error.spotifyBody = text;
-      throw error;
+      throw new SpotifyRequestError('invalid_response', response.status);
     }
   }
 
   if (!response.ok) {
     const spotifyObject = data && typeof data === 'object' ? (data as Record<string, unknown>) : null;
-    const nestedError =
-      spotifyObject && spotifyObject.error && typeof spotifyObject.error === 'object'
-        ? (spotifyObject.error as Record<string, unknown>)
-        : null;
-    const message =
-      (spotifyObject &&
-        typeof spotifyObject.error_description === 'string' &&
-        spotifyObject.error_description) ||
-      (nestedError && typeof nestedError.message === 'string' && nestedError.message) ||
-      (spotifyObject && typeof spotifyObject.error === 'string' && spotifyObject.error) ||
-      fallbackMessage;
-
-    const error = new Error(message) as Error & {
-      status?: number;
-      spotifyBody?: unknown;
-    };
-    error.status = response.status;
-    error.spotifyBody = data;
-    throw error;
+    const retryAfter = Number(response.headers.get('retry-after'));
+    throw new SpotifyRequestError(
+      spotifyObject?.error === 'invalid_grant' ? 'invalid_grant' : 'spotify_error',
+      response.status,
+      Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter : undefined
+    );
   }
 
   return data as T;
 }
 
 async function fetchSpotifyResource<T>(accessToken: string, url: string, fallbackMessage: string) {
-  const response = await fetch(url, {
+  const response = await requestSpotify(url, {
     headers: {
       Authorization: `Bearer ${accessToken}`
     }
@@ -134,7 +139,7 @@ async function fetchSpotifyAppAccessToken() {
     grant_type: 'client_credentials'
   });
 
-  const response = await fetch('https://accounts.spotify.com/api/token', {
+  const response = await requestSpotify('https://accounts.spotify.com/api/token', {
     method: 'POST',
     headers: {
       Authorization: `Basic ${basicAuth}`,
@@ -218,7 +223,7 @@ export async function exchangeCodeForTokens(code: string): Promise<SpotifyTokenR
     redirect_uri: env.SPOTIFY_REDIRECT_URI
   });
 
-  const response = await fetch('https://accounts.spotify.com/api/token', {
+  const response = await requestSpotify('https://accounts.spotify.com/api/token', {
     method: 'POST',
     headers: {
       Authorization: `Basic ${basicAuth}`,
@@ -239,6 +244,47 @@ export async function fetchSpotifyProfile(accessToken: string): Promise<SpotifyP
     'https://api.spotify.com/v1/me',
     'Spotify profile fetch failed.'
   );
+}
+
+export async function refreshSpotifyTokens(refreshToken: string): Promise<SpotifyTokenResponse> {
+  const credentials = Buffer.from(`${env.SPOTIFY_CLIENT_ID}:${env.SPOTIFY_CLIENT_SECRET}`).toString('base64');
+  const response = await requestSpotify('https://accounts.spotify.com/api/token', {
+    method: 'POST',
+    headers: {
+      Authorization: `Basic ${credentials}`,
+      'Content-Type': 'application/x-www-form-urlencoded'
+    },
+    body: new URLSearchParams({ grant_type: 'refresh_token', refresh_token: refreshToken })
+  });
+  return parseSpotifyResponse<SpotifyTokenResponse>(response, 'Spotify refresh failed.');
+}
+
+export async function syncUserMusicData(userId: string): Promise<void> {
+  const user = await prisma.user.findUnique({ where: { id: userId } });
+  if (!user?.spotifyAccessToken) throw new SpotifyRequestError('reconnect', 401);
+  try {
+    await syncTopMusicData(userId, user.spotifyAccessToken);
+    return;
+  } catch (error) {
+    if (!(error instanceof SpotifyRequestError) || error.status !== 401) throw error;
+  }
+  if (!user.spotifyRefreshToken) throw new SpotifyRequestError('reconnect', 401);
+  let tokens: SpotifyTokenResponse;
+  try {
+    tokens = await refreshSpotifyTokens(user.spotifyRefreshToken);
+  } catch (error) {
+    if (error instanceof SpotifyRequestError && error.code === 'invalid_grant') {
+      await prisma.user.update({ where: { id: userId }, data: {
+        spotifyAccessToken: null, spotifyRefreshToken: null, spotifyConnected: false
+      } });
+    }
+    throw error;
+  }
+  await prisma.user.update({ where: { id: userId }, data: {
+    spotifyAccessToken: tokens.access_token,
+    spotifyRefreshToken: tokens.refresh_token ?? user.spotifyRefreshToken
+  } });
+  await syncTopMusicData(userId, tokens.access_token);
 }
 
 export async function syncTopMusicData(userId: string, accessToken: string): Promise<void> {

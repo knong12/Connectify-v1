@@ -1,15 +1,10 @@
 import jwt from 'jsonwebtoken';
 import { env } from '../config/env.js';
 import { prisma } from '../lib/prisma.js';
-import { syncTopMusicData } from './spotifyService.js';
+import { syncUserMusicData } from './spotifyService.js';
 import type { SpotifyProfile, SpotifyTokenResponse } from '../types/auth.js';
 
-export function createSpotifyAuthState() {
-  // Step 1:
-  // Replace this with crypto.randomBytes(16).toString('hex')
-  // after you are ready to validate state values end to end.
-  return 'replace-this-state';
-}
+export { createSpotifyAuthState } from './oauthState.js';
 
 export async function upsertUserFromSpotify(
   profile: SpotifyProfile,
@@ -26,7 +21,7 @@ export async function upsertUserFromSpotify(
       displayName: profile.display_name,
       spotifyProfileImage: profile.images[0]?.url ?? null,
       spotifyAccessToken: tokens.access_token,
-      spotifyRefreshToken: tokens.refresh_token ?? null,
+      spotifyRefreshToken: tokens.refresh_token ?? undefined,
       spotifyConnected: true
     },
     create: {
@@ -44,7 +39,7 @@ export async function upsertUserFromSpotify(
 export async function finishSpotifyLogin(profile: SpotifyProfile, tokens: SpotifyTokenResponse) {
   const user = await upsertUserFromSpotify(profile, tokens);
 
-  await syncTopMusicData(user.id, tokens.access_token);
+  await syncUserMusicData(user.id);
 
   const appToken = jwt.sign(
     {

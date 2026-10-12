@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { env } from '../config/env.js';
-import { NotImplementedError } from '../lib/errors.js';
+import { consumeSpotifyAuthState, oauthStateLifetimeMs } from '../services/oauthState.js';
 import {
   createSpotifyAuthState,
   finishSpotifyLogin
@@ -8,40 +8,60 @@ import {
 import {
   buildSpotifyAuthorizeUrl,
   exchangeCodeForTokens,
-  fetchSpotifyProfile
+  fetchSpotifyProfile,
+  getSpotifyFailure
 } from '../services/spotifyService.js';
 
 const router = Router();
+const stateCookie = 'connectify_oauth_state';
+const cookieOptions = {
+  httpOnly: true,
+  secure: new URL(env.SPOTIFY_REDIRECT_URI).protocol === 'https:',
+  sameSite: 'lax' as const,
+  path: '/api/auth'
+};
+
+function failureUrl(code: string) {
+  const url = new URL('/', env.CLIENT_URL);
+  url.searchParams.set('authError', code);
+  return url.toString();
+}
 
 router.get('/spotify', (_req, res) => {
-  const state = createSpotifyAuthState();
-  const authUrl = buildSpotifyAuthorizeUrl(state);
-  res.redirect(authUrl.toString());
+  res.set('Cache-Control', 'no-store');
+  try {
+    const state = createSpotifyAuthState();
+    res.cookie(stateCookie, state, { ...cookieOptions, maxAge: oauthStateLifetimeMs });
+    res.redirect(buildSpotifyAuthorizeUrl(state));
+  } catch {
+    res.redirect(failureUrl('unavailable'));
+  }
 });
 
 router.get('/spotify/callback', async (req, res) => {
+  res.set('Cache-Control', 'no-store');
+  res.set('Referrer-Policy', 'no-referrer');
+  const cookies = (req.headers.cookie ?? '').split(';').map((cookie) => cookie.trim());
+  const cookieState = cookies.find((cookie) => cookie.startsWith(`${stateCookie}=`))?.slice(stateCookie.length + 1);
+  res.clearCookie(stateCookie, cookieOptions);
+  if (!consumeSpotifyAuthState(req.query.state, cookieState)) {
+    res.redirect(failureUrl('invalid_state'));
+    return;
+  }
   const code = typeof req.query.code === 'string' ? req.query.code : null;
   const error = typeof req.query.error === 'string' ? req.query.error : null;
 
   if (error) {
-    res.status(400).json({
-      message: 'Spotify returned an error.',
-      error
-    });
+    res.redirect(failureUrl(error === 'access_denied' ? 'cancelled' : 'login_failed'));
     return;
   }
 
   if (!code) {
-    res.status(400).json({
-      message: 'Missing Spotify authorization code.'
-    });
+    res.redirect(failureUrl('missing_code'));
     return;
   }
 
   try {
-    // Step 3:
-    // Implement each function below in order. The route already shows the
-    // end-to-end orchestration you are aiming for.
     const tokens = await exchangeCodeForTokens(code);
     const profile = await fetchSpotifyProfile(tokens.access_token);
     const { appToken, user } = await finishSpotifyLogin(profile, tokens);
@@ -51,24 +71,9 @@ router.get('/spotify/callback', async (req, res) => {
 
     res.redirect(redirectUrl.toString());
   } catch (error) {
-    if (error instanceof NotImplementedError) {
-      res.status(501).json({
-        message: error.message,
-        stepGuide: [
-          'Step 3: Exchange the callback code for Spotify tokens.',
-          'Step 4: Fetch the Spotify profile.',
-          'Step 5: Upsert the user in Postgres.',
-          'Step 6: Sync top music data.',
-          'Step 7: Return or redirect with the app JWT.'
-        ]
-      });
-      return;
-    }
-
-    res.status(500).json({
-      message: 'Unexpected error during Spotify callback.',
-      error: error instanceof Error ? error.message : 'Unknown error'
-    });
+    const failure = getSpotifyFailure(error);
+    console.warn('Spotify login failed.', { code: failure.code, status: failure.status });
+    res.redirect(failureUrl(failure.code));
   }
 });
 
