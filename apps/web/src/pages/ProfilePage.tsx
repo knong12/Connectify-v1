@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import {
   fetchProfile,
   fetchUserProfile,
@@ -52,6 +52,8 @@ function formatJoinedNames(values: string[]) {
 
 export default function ProfilePage() {
   const { userId: routeUserId } = useParams();
+  const location = useLocation();
+  const navigate = useNavigate();
   const [state, setState] = useState<LoadState>({ status: 'idle' });
   const [form, setForm] = useState<ProfileFormState>({
     bio: '',
@@ -64,6 +66,15 @@ export default function ProfilePage() {
   }>({ status: 'idle' });
   const [activeTimeRange, setActiveTimeRange] = useState<SpotifyTimeRange>('medium_term');
   const isViewingOtherProfile = Boolean(routeUserId);
+  const backButton = isViewingOtherProfile ? (
+    <button
+      className="profile-back-button"
+      type="button"
+      onClick={() => location.key === 'default' ? navigate('/profile', { replace: true }) : navigate(-1)}
+    >
+      <span aria-hidden="true">&larr;</span> Back
+    </button>
+  ) : null;
 
   useEffect(() => {
     const token = saveTokenFromUrl() ?? getStoredToken();
@@ -77,11 +88,13 @@ export default function ProfilePage() {
     }
 
     setState({ status: 'loading' });
+    let cancelled = false;
 
     const profileRequest = routeUserId ? fetchUserProfile(token, routeUserId) : fetchProfile(token);
 
     profileRequest
       .then((data) => {
+        if (cancelled) return;
         setForm({
           bio: data.user.bio ?? '',
           favoriteArtistNote: data.user.favoriteArtistNote ?? '',
@@ -93,28 +106,36 @@ export default function ProfilePage() {
         });
       })
       .catch((error) => {
+        if (cancelled) return;
         setState({
           status: 'error',
           message: error instanceof Error ? error.message : 'Failed to load profile.'
         });
       });
+    return () => { cancelled = true; };
   }, [routeUserId]);
 
   if (state.status === 'idle' || state.status === 'loading') {
     return (
+      <div className="stack">
+      {backButton}
       <section className="card">
         <h2>Profile</h2>
         <p>Loading your synced Spotify profile...</p>
       </section>
+      </div>
     );
   }
 
   if (state.status === 'error') {
     return (
+      <div className="stack">
+      {backButton}
       <section className="card">
         <h2>Profile</h2>
         <p>{state.message}</p>
       </section>
+      </div>
     );
   }
 
@@ -163,6 +184,7 @@ export default function ProfilePage() {
 
   return (
     <div className="stack">
+      {backButton}
       <section className="card profile-hero profile-hero-rich">
         <div className="profile-identity">
           {profile.spotifyProfileImage ? (
@@ -230,22 +252,7 @@ export default function ProfilePage() {
         </div>
       </section>
 
-      {isViewingOtherProfile ? (
-        <section className="card">
-          <div className="section-heading">
-            <div>
-              <p className="eyebrow">Shared Profile View</p>
-              <h2>Back to your own profile when you are ready</h2>
-            </div>
-          </div>
-          <p className="section-intro">
-            You are currently viewing another Connectify profile in read-only mode.
-          </p>
-          <Link className="button button-ghost" to="/profile">
-            Return to my profile
-          </Link>
-        </section>
-      ) : (
+      {!isViewingOtherProfile ? (
         <section className="card">
           <div className="section-heading">
             <div>
@@ -319,7 +326,7 @@ export default function ProfilePage() {
             </div>
           </form>
         </section>
-      )}
+      ) : null}
 
       <section className="card">
         <h2>Profile Snapshot</h2>
@@ -363,7 +370,12 @@ export default function ProfilePage() {
           <div className="list-grid">
             {profile.followers.length > 0 ? (
               profile.followers.map((follower) => (
-                <article className="mini-user-card" key={follower.id}>
+                <Link
+                  className="mini-user-card mini-user-link"
+                  key={follower.id}
+                  to={`/profile/${encodeURIComponent(follower.id)}`}
+                  aria-label={`View ${follower.displayName}'s profile`}
+                >
                   {follower.spotifyProfileImage ? (
                     <img
                       alt={`${follower.displayName} Spotify profile`}
@@ -378,7 +390,7 @@ export default function ProfilePage() {
                   <div>
                     <h3>{follower.displayName}</h3>
                   </div>
-                </article>
+                </Link>
               ))
             ) : (
               <p className="muted">No followers yet.</p>
@@ -392,7 +404,12 @@ export default function ProfilePage() {
           <div className="list-grid">
             {profile.followingUsers.length > 0 ? (
               profile.followingUsers.map((followedUser) => (
-                <article className="mini-user-card" key={followedUser.id}>
+                <Link
+                  className="mini-user-card mini-user-link"
+                  key={followedUser.id}
+                  to={`/profile/${encodeURIComponent(followedUser.id)}`}
+                  aria-label={`View ${followedUser.displayName}'s profile`}
+                >
                   {followedUser.spotifyProfileImage ? (
                     <img
                       alt={`${followedUser.displayName} Spotify profile`}
@@ -407,7 +424,7 @@ export default function ProfilePage() {
                   <div>
                     <h3>{followedUser.displayName}</h3>
                   </div>
-                </article>
+                </Link>
               ))
             ) : (
               <p className="muted">Not following anyone yet.</p>

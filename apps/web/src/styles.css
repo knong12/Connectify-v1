@@ -64,9 +64,19 @@ code {
 
 .nav .logout-button {
   border: none;
-  color: inherit;
+  background: #b91c1c;
+  color: white;
   font: inherit;
   cursor: pointer;
+}
+
+.nav .logout-button:hover {
+  background: #991b1b;
+}
+
+.nav .logout-button:focus-visible {
+  outline: 2px solid #b91c1c;
+  outline-offset: 3px;
 }
 
 .nav a.active {
@@ -159,6 +169,30 @@ code {
 .button-ghost {
   background: #eef4ff;
   color: #102030;
+}
+
+.profile-back-button {
+  justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: #102030;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.profile-back-button:hover {
+  background: #eef4ff;
+}
+
+.profile-back-button:focus-visible {
+  outline: 2px solid #102030;
+  outline-offset: 3px;
 }
 
 .eyebrow {
@@ -414,6 +448,27 @@ code {
 
 .mini-user-card h3 {
   margin: 0;
+}
+
+.mini-user-link:hover {
+  background: #e8f0f8;
+}
+
+.mini-user-link:focus-visible {
+  outline: 2px solid #102030;
+  outline-offset: 3px;
+}
+
+.mini-user-link > div {
+  min-width: 0;
+}
+
+.mini-user-link h3 {
+  overflow-wrap: anywhere;
+}
+
+.mini-user-link .mini-avatar {
+  flex-shrink: 0;
 }
 
 .mini-avatar {
