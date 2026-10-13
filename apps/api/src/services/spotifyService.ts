@@ -9,6 +9,8 @@ const spotifyScopes = [
 ];
 
 const spotifyTimeRanges = ['short_term', 'medium_term', 'long_term'] as const;
+const spotifyTopItemsLimit = 50;
+const spotifyArtistLookupBatchSize = 50;
 type SpotifyTimeRange = (typeof spotifyTimeRanges)[number];
 
 type SpotifyArtist = {
@@ -163,17 +165,19 @@ async function fetchArtistsByIds(accessToken: string, artistIds: string[]) {
 
   console.log('[spotify sync] artist ids for detail lookup:', artistIds);
 
-  const params = new URLSearchParams({
-    ids: artistIds.join(',')
-  });
-
-  const response = await fetchSpotifyResource<SpotifyArtistsLookupResponse>(
-    accessToken,
-    `https://api.spotify.com/v1/artists?${params.toString()}`,
-    'Spotify artist details fetch failed.'
-  );
-
-  return response.artists;
+  const artists: SpotifyArtist[] = [];
+  for (let offset = 0; offset < artistIds.length; offset += spotifyArtistLookupBatchSize) {
+    const params = new URLSearchParams({
+      ids: artistIds.slice(offset, offset + spotifyArtistLookupBatchSize).join(',')
+    });
+    const response = await fetchSpotifyResource<SpotifyArtistsLookupResponse>(
+      accessToken,
+      `https://api.spotify.com/v1/artists?${params.toString()}`,
+      'Spotify artist details fetch failed.'
+    );
+    artists.push(...response.artists);
+  }
+  return artists;
 }
 
 function slugifyGenre(genre: string) {
@@ -293,7 +297,7 @@ export async function syncTopMusicData(userId: string, accessToken: string): Pro
       timeRange,
       response: await fetchSpotifyResource<SpotifyPagingResponse<SpotifyArtist>>(
         accessToken,
-        `https://api.spotify.com/v1/me/top/artists?limit=10&time_range=${timeRange}`,
+        `https://api.spotify.com/v1/me/top/artists?limit=${spotifyTopItemsLimit}&time_range=${timeRange}`,
         `Spotify top artists fetch failed for ${timeRange}.`
       )
     }))
@@ -304,7 +308,7 @@ export async function syncTopMusicData(userId: string, accessToken: string): Pro
       timeRange,
       response: await fetchSpotifyResource<SpotifyPagingResponse<SpotifyTrack>>(
         accessToken,
-        `https://api.spotify.com/v1/me/top/tracks?limit=10&time_range=${timeRange}`,
+        `https://api.spotify.com/v1/me/top/tracks?limit=${spotifyTopItemsLimit}&time_range=${timeRange}`,
         `Spotify top tracks fetch failed for ${timeRange}.`
       )
     }))
@@ -508,5 +512,5 @@ export async function syncTopMusicData(userId: string, accessToken: string): Pro
         });
       }
     }
-  });
+  }, { timeout: 60000 });
 }

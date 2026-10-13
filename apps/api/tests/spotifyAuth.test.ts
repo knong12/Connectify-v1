@@ -9,6 +9,59 @@ process.env.SPOTIFY_CLIENT_ID ??= 'test-client';
 process.env.SPOTIFY_CLIENT_SECRET ??= 'test-secret';
 process.env.SPOTIFY_REDIRECT_URI ??= 'http://127.0.0.1:5000/api/auth/spotify/callback';
 
+for (const itemCount of [0, 7, 50]) {
+  test(`music sync requests up to 50 items and persists ${itemCount} per range`, async (t) => {
+    const service = await import('../src/services/spotifyService.js');
+    const { prisma } = await import('../src/lib/prisma.js');
+    const originalTransaction = prisma.$transaction;
+    t.after(() => { prisma.$transaction = originalTransaction; });
+    t.mock.method(console, 'log', () => {});
+    const artistRows: { rank: number; timeRange: string; artistId: string }[] = [];
+    const trackRows: { rank: number; timeRange: string; trackId: string }[] = [];
+    const lookupIds: string[] = [];
+    const topRequests: string[] = [];
+    const entity = {
+      deleteMany: async () => ({}),
+      upsert: async () => ({}),
+      findUniqueOrThrow: async ({ where }: { where: { spotifyId: string } }) => ({ id: where.spotifyId })
+    };
+    prisma.$transaction = (async (callback: (tx: unknown) => Promise<void>) => callback({
+      artist: entity, track: entity,
+      userFavoriteGenre: entity,
+      userFavoriteArtist: { ...entity, create: async ({ data }: { data: typeof artistRows[number] }) => { artistRows.push(data); } },
+      userFavoriteTrack: { ...entity, create: async ({ data }: { data: typeof trackRows[number] }) => { trackRows.push(data); } }
+    })) as typeof originalTransaction;
+    t.mock.method(globalThis, 'fetch', async (input: string) => {
+      const url = new URL(String(input));
+      if (url.pathname === '/api/token') return Response.json({ access_token: 'app-token' });
+      if (url.pathname === '/v1/artists') {
+        const ids = url.searchParams.get('ids')!.split(',');
+        assert.ok(ids.length <= 50);
+        lookupIds.push(...ids);
+        return Response.json({ artists: ids.map((id) => ({ id, name: id, genres: [], images: [] })) });
+      }
+      assert.equal(url.searchParams.get('limit'), '50');
+      topRequests.push(url.pathname);
+      const range = url.searchParams.get('time_range');
+      const artists = url.pathname.endsWith('/artists');
+      return Response.json({ items: Array.from({ length: itemCount }, (_, index) => ({
+        id: `${artists ? 'artist' : 'track'}-${range}-${index}`,
+        name: `Item ${index}`, genres: [], images: [],
+        album: { name: 'Album', images: [] }, artists: [], preview_url: null
+      })) });
+    });
+    await service.syncTopMusicData('test-user', 'test-access');
+    assert.equal(topRequests.length, 6);
+    assert.equal(lookupIds.length, itemCount * 3);
+    assert.equal(new Set(lookupIds).size, itemCount * 3);
+    for (const range of ['short_term', 'medium_term', 'long_term']) {
+      const expectedRanks = Array.from({ length: itemCount }, (_, index) => index + 1);
+      assert.deepEqual(artistRows.filter((row) => row.timeRange === range).map((row) => row.rank), expectedRanks);
+      assert.deepEqual(trackRows.filter((row) => row.timeRange === range).map((row) => row.rank), expectedRanks);
+    }
+  });
+}
+
 test('OAuth state is random, bound to the cookie, and single-use', () => {
   const state = createSpotifyAuthState();
   const otherState = createSpotifyAuthState();
