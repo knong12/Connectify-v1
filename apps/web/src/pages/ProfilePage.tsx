@@ -364,10 +364,9 @@ export default function ProfilePage() {
       </section>
 
       <div className="profile-grid">
-        <section className="card">
+        <section className="card profile-social-section">
           <h2>Followers</h2>
-          <p className="section-intro">You got fans.</p>
-          <div className="list-grid">
+          <div className="list-grid profile-social-list">
             {profile.followers.length > 0 ? (
               profile.followers.map((follower) => (
                 <Link
@@ -398,10 +397,9 @@ export default function ProfilePage() {
           </div>
         </section>
 
-        <section className="card">
+        <section className="card profile-social-section">
           <h2>Following</h2>
-          <p className="section-intro">Keep that following count low.</p>
-          <div className="list-grid">
+          <div className="list-grid profile-social-list">
             {profile.followingUsers.length > 0 ? (
               profile.followingUsers.map((followedUser) => (
                 <Link

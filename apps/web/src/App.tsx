@@ -4,9 +4,51 @@ import HomePage from './pages/HomePage';
 import MatchesPage from './pages/MatchesPage';
 import ProfilePage from './pages/ProfilePage';
 
+const themeStorageKey = 'connectify_theme';
+
+function readThemePreference(): 'light' | 'dark' | null {
+  try {
+    const value = localStorage.getItem(themeStorageKey);
+    return value === 'light' || value === 'dark' ? value : null;
+  } catch {
+    return null;
+  }
+}
+
 export default function App() {
   const location = useLocation();
   const navigate = useNavigate();
+  const [themePreference, setThemePreference] = useState(readThemePreference);
+  const [systemDark, setSystemDark] = useState(() => window.matchMedia('(prefers-color-scheme: dark)').matches);
+  const theme = themePreference ?? (systemDark ? 'dark' : 'light');
+
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme;
+  }, [theme]);
+
+  useEffect(() => {
+    const media = window.matchMedia('(prefers-color-scheme: dark)');
+    const onChange = () => setSystemDark(media.matches);
+    const onStorage = (event: StorageEvent) => {
+      if (event.key === themeStorageKey || event.key === null) setThemePreference(readThemePreference());
+    };
+    media.addEventListener('change', onChange);
+    window.addEventListener('storage', onStorage);
+    return () => {
+      media.removeEventListener('change', onChange);
+      window.removeEventListener('storage', onStorage);
+    };
+  }, []);
+
+  function toggleTheme() {
+    const next = theme === 'dark' ? 'light' : 'dark';
+    setThemePreference(next);
+    try {
+      localStorage.setItem(themeStorageKey, next);
+    } catch {
+      // Theme switching still works when browser storage is unavailable.
+    }
+  }
   const [isSignedIn, setIsSignedIn] = useState(() =>
     Boolean(localStorage.getItem('connectify_app_token'))
   );
@@ -48,6 +90,17 @@ export default function App() {
           <NavLink to="/">Home</NavLink>
           <NavLink to="/profile">Profile</NavLink>
           <NavLink to="/matches">Matches</NavLink>
+          <button
+            className="theme-toggle"
+            type="button"
+            role="switch"
+            aria-checked={theme === 'dark'}
+            onClick={toggleTheme}
+            title="Toggle dark mode"
+          >
+            <span className="theme-switch-track" aria-hidden="true"><span /></span>
+            Dark mode
+          </button>
           {isSignedIn ? (
             <button className="logout-button" onClick={handleLogout} type="button">
               Log out

@@ -1,4 +1,5 @@
 :root {
+  color-scheme: light;
   font-family: "Segoe UI", system-ui, sans-serif;
   color: #102030;
   background:
@@ -53,6 +54,120 @@ code {
   display: flex;
   gap: 1rem;
   flex-wrap: wrap;
+  align-items: center;
+}
+
+.theme-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 36px;
+  padding: 0.5rem 0.8rem;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.theme-toggle:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 3px;
+}
+
+.theme-switch-track {
+  display: inline-flex;
+  align-items: center;
+  width: 34px;
+  height: 20px;
+  padding: 3px;
+  border-radius: 10px;
+  background: #64748b;
+  flex-shrink: 0;
+}
+
+.theme-switch-track > span {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: white;
+}
+
+.theme-toggle[aria-checked="true"] .theme-switch-track {
+  background: #15743a;
+}
+
+.theme-toggle[aria-checked="true"] .theme-switch-track > span {
+  transform: translateX(14px);
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  color: #f1f3f2;
+  background: #151817;
+}
+
+:root[data-theme="dark"] :is(.hero, .card, .home-hero, .profile-hero-rich) {
+  background: #202522;
+  box-shadow: 0 10px 40px rgb(0 0 0 / 18%);
+}
+
+:root[data-theme="dark"] :is(.home-hero-card, .profile-sidecard, .match-story, .match-social-block) {
+  background: #282f2b;
+  border-color: #465149;
+}
+
+:root[data-theme="dark"] :is(.stat, .mini-user-card, .music-card, .match-detail-panel, code) {
+  background: #2a312d;
+  border-color: #465149;
+}
+
+:root[data-theme="dark"] :is(.home-lead, .eyebrow, .muted, .stat-label, .score-badge span, .section-intro, .match-note) {
+  color: #bac7be;
+}
+
+:root[data-theme="dark"] :is(.field-label, .match-story-lead, .match-bio, .match-note span, .profile-back-button) {
+  color: #f1f3f2;
+}
+
+:root[data-theme="dark"] :is(.nav a, .button-ghost, .pill, .tag, .tab-button, .cover-fallback) {
+  background: #343e37;
+  color: #e2eae5;
+  border-color: #607065;
+}
+
+:root[data-theme="dark"] :is(.nav a.active, .tab-button.active, .button-secondary) {
+  background: #d8e5dc;
+  color: #18251c;
+  border-color: #d8e5dc;
+}
+
+:root[data-theme="dark"] :is(.pill-success, .score-badge) {
+  background: #244b34;
+  color: #bbf0cd;
+}
+
+:root[data-theme="dark"] :is(.field input, .field textarea) {
+  background: #181e1a;
+  color: #f1f3f2;
+  border-color: #607065;
+}
+
+:root[data-theme="dark"] :is(.field input, .field textarea)::placeholder {
+  color: #aabbaf;
+}
+
+:root[data-theme="dark"] .preview-link {
+  color: #8fe0ac;
+}
+
+:root[data-theme="dark"] :is(.mini-user-link, .profile-back-button):hover {
+  background: #3b493f;
+}
+
+:root[data-theme="dark"] :is(.mini-user-link, .profile-back-button):focus-visible {
+  outline-color: #bbf0cd;
 }
 
 .nav a,
@@ -476,6 +591,46 @@ code {
   height: 52px;
   border-radius: 14px;
   object-fit: cover;
+}
+
+.profile-social-section {
+  padding: 1rem;
+  min-width: 0;
+  align-self: start;
+}
+
+.profile-social-section h2 {
+  font-size: 1.1rem;
+  margin-bottom: 0.5rem;
+}
+
+.profile-social-list {
+  gap: 0.3rem;
+  max-height: 12rem;
+  overflow-y: auto;
+  padding: 4px;
+}
+
+.profile-social-list .mini-user-card {
+  min-height: 44px;
+  padding: 0.35rem 0.5rem;
+  gap: 0.65rem;
+  border-radius: 6px;
+}
+
+.profile-social-list .mini-user-card h3 {
+  font-size: 0.95rem;
+  line-height: 1.4;
+}
+
+.profile-social-list .mini-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+}
+
+.profile-social-list .avatar-fallback {
+  font-size: 1rem;
 }
 
 .matches-hero {
