@@ -4,9 +4,9 @@ import {
   fetchProfile,
   fetchUserProfile,
   type ProfileResponse,
-  type SpotifyTimeRange,
-  updateProfile
+  type SpotifyTimeRange
 } from '../lib/api';
+import ProfileActions from '../components/ProfileActions';
 
 const tokenStorageKey = 'connectify_app_token';
 const timeRangeLabels: Record<SpotifyTimeRange, string> = {
@@ -20,12 +20,6 @@ type LoadState =
   | { status: 'loading' }
   | { status: 'error'; message: string }
   | { status: 'ready'; profile: ProfileResponse['user'] };
-
-type ProfileFormState = {
-  bio: string;
-  favoriteArtistNote: string;
-  musicPrompt: string;
-};
 
 function saveTokenFromUrl() {
   const url = new URL(window.location.href);
@@ -55,15 +49,6 @@ export default function ProfilePage() {
   const location = useLocation();
   const navigate = useNavigate();
   const [state, setState] = useState<LoadState>({ status: 'idle' });
-  const [form, setForm] = useState<ProfileFormState>({
-    bio: '',
-    favoriteArtistNote: '',
-    musicPrompt: ''
-  });
-  const [saveState, setSaveState] = useState<{
-    status: 'idle' | 'saving' | 'saved' | 'error';
-    message?: string;
-  }>({ status: 'idle' });
   const [activeTimeRange, setActiveTimeRange] = useState<SpotifyTimeRange>('medium_term');
   const isViewingOtherProfile = Boolean(routeUserId);
   const backButton = isViewingOtherProfile ? (
@@ -95,11 +80,6 @@ export default function ProfilePage() {
     profileRequest
       .then((data) => {
         if (cancelled) return;
-        setForm({
-          bio: data.user.bio ?? '',
-          favoriteArtistNote: data.user.favoriteArtistNote ?? '',
-          musicPrompt: data.user.musicPrompt ?? ''
-        });
         setState({
           status: 'ready',
           profile: data.user
@@ -144,47 +124,15 @@ export default function ProfilePage() {
   const displayedArtists = profile.favoriteArtistsByRange[activeTimeRange] ?? [];
   const displayedTracks = profile.favoriteTracksByRange[activeTimeRange] ?? [];
 
-  async function handleProfileSave(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-
-    const token = getStoredToken();
-
-    if (!token) {
-      setSaveState({
-        status: 'error',
-        message: 'No login token was found. Please sign in again.'
-      });
-      return;
-    }
-
-    setSaveState({ status: 'saving' });
-
-    try {
-      const updated = await updateProfile(token, form);
-      setState({
-        status: 'ready',
-        profile: updated.user
-      });
-      setForm({
-        bio: updated.user.bio ?? '',
-        favoriteArtistNote: updated.user.favoriteArtistNote ?? '',
-        musicPrompt: updated.user.musicPrompt ?? ''
-      });
-      setSaveState({
-        status: 'saved',
-        message: 'Profile details saved.'
-      });
-    } catch (error) {
-      setSaveState({
-        status: 'error',
-        message: error instanceof Error ? error.message : 'Failed to save profile.'
-      });
-    }
-  }
-
   return (
     <div className="stack">
       {backButton}
+      {!isViewingOtherProfile && (
+        <div className="profile-toolbar">
+          {location.state?.profileSaved ? <p role="status" className="profile-save-notice">Profile changes saved.</p> : <span />}
+          <ProfileActions />
+        </div>
+      )}
       <section className="card profile-hero profile-hero-rich">
         <div className="profile-identity">
           {profile.spotifyProfileImage ? (
@@ -251,82 +199,6 @@ export default function ProfilePage() {
           ) : null}
         </div>
       </section>
-
-      {!isViewingOtherProfile ? (
-        <section className="card">
-          <div className="section-heading">
-            <div>
-              <p className="eyebrow">Profile Customization</p>
-              <h2>Make your profile feel personal</h2>
-            </div>
-            {saveState.status === 'saved' ? (
-              <span className="pill pill-success">Saved</span>
-            ) : null}
-          </div>
-
-          <p className="section-intro">
-            Add a short read on your taste so your matches get more context than just a score.
-          </p>
-
-          <form className="profile-form" onSubmit={handleProfileSave}>
-            <label className="field">
-              <span className="field-label">Short bio</span>
-              <textarea
-                maxLength={240}
-                onChange={(event) =>
-                  setForm((current) => ({ ...current, bio: event.target.value }))
-                }
-                placeholder="Say a little bit about your music taste."
-                rows={4}
-                value={form.bio}
-              />
-            </label>
-
-            <div className="form-grid">
-              <label className="field">
-                <span className="field-label">Favorite artist highlight</span>
-                <input
-                  maxLength={120}
-                  onChange={(event) =>
-                    setForm((current) => ({
-                      ...current,
-                      favoriteArtistNote: event.target.value
-                    }))
-                  }
-                  placeholder="Who always makes it into your rotation?"
-                  type="text"
-                  value={form.favoriteArtistNote}
-                />
-              </label>
-
-              <label className="field">
-                <span className="field-label">Music prompt</span>
-                <input
-                  maxLength={180}
-                  onChange={(event) =>
-                    setForm((current) => ({
-                      ...current,
-                      musicPrompt: event.target.value
-                    }))
-                  }
-                  placeholder="A perfect late-night album is..."
-                  type="text"
-                  value={form.musicPrompt}
-                />
-              </label>
-            </div>
-
-            <div className="form-actions">
-              <button className="button" disabled={saveState.status === 'saving'} type="submit">
-                {saveState.status === 'saving' ? 'Saving...' : 'Save profile'}
-              </button>
-              {saveState.status === 'error' ? (
-                <p className="muted">{saveState.message}</p>
-              ) : null}
-            </div>
-          </form>
-        </section>
-      ) : null}
 
       <section className="card">
         <h2>Profile Snapshot</h2>
