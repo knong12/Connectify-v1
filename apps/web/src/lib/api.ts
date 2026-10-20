@@ -7,7 +7,6 @@ type FavoriteArtist = {
   spotifyId: string;
   name: string;
   imageUrl: string | null;
-  genres: string[];
   rank: number;
 };
 
@@ -49,12 +48,6 @@ export type ProfileResponse = {
     }[];
     createdAt: string;
     updatedAt: string;
-    favoriteGenres: {
-      id: string;
-      slug: string;
-      label: string;
-      rank: number;
-    }[];
     favoriteArtists: FavoriteArtist[];
     favoriteTracks: FavoriteTrack[];
     favoriteArtistsByRange: Record<SpotifyTimeRange, FavoriteArtist[]>;

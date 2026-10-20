@@ -16,10 +16,6 @@ export async function getUserProfileById(userId: string) {
           following: true
         }
       },
-      favoriteGenres: {
-        include: { genre: true },
-        orderBy: { rank: 'asc' }
-      },
       favoriteArtists: {
         include: { artist: true },
         orderBy: [{ timeRange: 'asc' }, { rank: 'asc' }]

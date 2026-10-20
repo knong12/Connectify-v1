@@ -18,42 +18,40 @@ for (const itemCount of [0, 7, 50]) {
     t.mock.method(console, 'log', () => {});
     const artistRows: { rank: number; timeRange: string; artistId: string }[] = [];
     const trackRows: { rank: number; timeRange: string; trackId: string }[] = [];
-    const lookupIds: string[] = [];
     const topRequests: string[] = [];
     const entity = {
       deleteMany: async () => ({}),
-      upsert: async () => ({}),
+      upsert: async ({ create, update }: { create: Record<string, unknown>; update: Record<string, unknown> }) => {
+        assert.equal(Object.hasOwn(create, 'genres'), false);
+        assert.equal(Object.hasOwn(update, 'genres'), false);
+        if (Object.hasOwn(create, 'imageUrl')) {
+          assert.equal(create.imageUrl, 'https://example.com/artist.jpg');
+          assert.equal(update.imageUrl, 'https://example.com/artist.jpg');
+        }
+        return {};
+      },
       findUniqueOrThrow: async ({ where }: { where: { spotifyId: string } }) => ({ id: where.spotifyId })
     };
     prisma.$transaction = (async (callback: (tx: unknown) => Promise<void>) => callback({
       artist: entity, track: entity,
-      userFavoriteGenre: entity,
       userFavoriteArtist: { ...entity, create: async ({ data }: { data: typeof artistRows[number] }) => { artistRows.push(data); } },
       userFavoriteTrack: { ...entity, create: async ({ data }: { data: typeof trackRows[number] }) => { trackRows.push(data); } }
     })) as typeof originalTransaction;
     t.mock.method(globalThis, 'fetch', async (input: string) => {
       const url = new URL(String(input));
-      if (url.pathname === '/api/token') return Response.json({ access_token: 'app-token' });
-      if (url.pathname === '/v1/artists') {
-        const ids = url.searchParams.get('ids')!.split(',');
-        assert.ok(ids.length <= 50);
-        lookupIds.push(...ids);
-        return Response.json({ artists: ids.map((id) => ({ id, name: id, genres: [], images: [] })) });
-      }
+      assert.ok(['/v1/me/top/artists', '/v1/me/top/tracks'].includes(url.pathname));
       assert.equal(url.searchParams.get('limit'), '50');
       topRequests.push(url.pathname);
       const range = url.searchParams.get('time_range');
       const artists = url.pathname.endsWith('/artists');
       return Response.json({ items: Array.from({ length: itemCount }, (_, index) => ({
         id: `${artists ? 'artist' : 'track'}-${range}-${index}`,
-        name: `Item ${index}`, genres: [], images: [],
+        name: `Item ${index}`, images: [{ url: 'https://example.com/artist.jpg' }],
         album: { name: 'Album', images: [] }, artists: [], preview_url: null
       })) });
     });
     await service.syncTopMusicData('test-user', 'test-access');
     assert.equal(topRequests.length, 6);
-    assert.equal(lookupIds.length, itemCount * 3);
-    assert.equal(new Set(lookupIds).size, itemCount * 3);
     for (const range of ['short_term', 'medium_term', 'long_term']) {
       const expectedRanks = Array.from({ length: itemCount }, (_, index) => index + 1);
       assert.deepEqual(artistRows.filter((row) => row.timeRange === range).map((row) => row.rank), expectedRanks);

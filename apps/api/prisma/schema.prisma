@@ -29,7 +29,6 @@ model User {
   updatedAt            DateTime            @updatedAt
   following            Follow[]            @relation("UserFollowing")
   followers            Follow[]            @relation("UserFollowers")
-  favoriteGenres       UserFavoriteGenre[]
   favoriteArtists      UserFavoriteArtist[]
   favoriteTracks       UserFavoriteTrack[]
 }
@@ -45,14 +44,6 @@ model Follow {
   @@unique([followerId, followingId])
 }
 
-model Genre {
-  id        String              @id @default(uuid())
-  slug      String              @unique
-  label     String
-  createdAt DateTime            @default(now())
-  users     UserFavoriteGenre[]
-}
-
 model Artist {
   id        String               @id @default(uuid())
   spotifyId String               @unique
@@ -60,7 +51,6 @@ model Artist {
   imageUrl  String?
   createdAt DateTime             @default(now())
   updatedAt DateTime             @updatedAt
-  genres    String[]
   users     UserFavoriteArtist[]
 }
 
@@ -75,19 +65,6 @@ model Track {
   createdAt  DateTime            @default(now())
   updatedAt  DateTime            @updatedAt
   users      UserFavoriteTrack[]
-}
-
-model UserFavoriteGenre {
-  id        String   @id @default(uuid())
-  userId    String
-  genreId   String
-  rank      Int
-  createdAt DateTime @default(now())
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  genre     Genre    @relation(fields: [genreId], references: [id], onDelete: Cascade)
-
-  @@unique([userId, genreId])
-  @@unique([userId, rank])
 }
 
 model UserFavoriteArtist {

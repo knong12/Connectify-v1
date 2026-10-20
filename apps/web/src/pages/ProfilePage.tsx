@@ -40,10 +40,6 @@ function getStoredToken() {
   return localStorage.getItem(tokenStorageKey);
 }
 
-function formatJoinedNames(values: string[]) {
-  return values.filter(Boolean).join(', ');
-}
-
 export default function ProfilePage() {
   const { userId: routeUserId } = useParams();
   const location = useLocation();
@@ -120,7 +116,6 @@ export default function ProfilePage() {
   }
 
   const { profile } = state;
-  const topGenreLabels = profile.favoriteGenres.map((genre) => genre.label).slice(0, 5);
   const displayedArtists = profile.favoriteArtistsByRange[activeTimeRange] ?? [];
   const displayedTracks = profile.favoriteTracksByRange[activeTimeRange] ?? [];
 
@@ -172,19 +167,6 @@ export default function ProfilePage() {
               ? 'What defines me?'
               : 'What defines you?'}
           </p>
-          {topGenreLabels.length > 0 ? (
-            <div className="tag-cloud">
-              {topGenreLabels.map((label) => (
-                <span className="tag" key={label}>
-                  {label}
-                </span>
-              ))}
-            </div>
-          ) : (
-            <p className="muted">
-              
-            </p>
-          )}
           {profile.favoriteArtistNote ? (
             <div className="side-note">
               <p className="eyebrow">Favorite Artist Note</p>
@@ -197,41 +179,6 @@ export default function ProfilePage() {
               <p className="muted">{profile.musicPrompt}</p>
             </div>
           ) : null}
-        </div>
-      </section>
-
-      <section className="card">
-        <h2>Profile Snapshot</h2>
-        <p className="section-intro">
-          A quick read on how much music data and social activity is tied to your account right now.
-        </p>
-        <div className="stats-grid">
-          <div className="stat">
-            <span className="stat-label">Top Artists</span>
-            <strong>{profile.favoriteArtists.length}</strong>
-          </div>
-          <div className="stat">
-            <span className="stat-label">Top Tracks</span>
-            <strong>{profile.favoriteTracks.length}</strong>
-          </div>
-          <div className="stat">
-            <span className="stat-label">Genre Entries</span>
-            <strong>{profile.favoriteGenres.length}</strong>
-          </div>
-          <div className="stat">
-            <span className="stat-label">Member Since</span>
-            <strong className="stat-detail">
-              {new Date(profile.createdAt).toLocaleDateString()}
-            </strong>
-          </div>
-          <div className="stat">
-            <span className="stat-label">Followers</span>
-            <strong>{profile.followerCount}</strong>
-          </div>
-          <div className="stat">
-            <span className="stat-label">Following</span>
-            <strong>{profile.followingCount}</strong>
-          </div>
         </div>
       </section>
 
@@ -332,11 +279,6 @@ export default function ProfilePage() {
                 <div>
                   <p className="eyebrow">Rank #{artist.rank}</p>
                   <h3>{artist.name}</h3>
-                  {artist.genres.length > 0 ? (
-                    <p className="muted">{formatJoinedNames(artist.genres.slice(0, 3))}</p>
-                  ) : (
-                    <p className="muted">Genre labels Place Holder</p>
-                  )}
                 </div>
               </article>
             ))}

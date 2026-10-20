@@ -10,13 +10,11 @@ const spotifyScopes = [
 
 const spotifyTimeRanges = ['short_term', 'medium_term', 'long_term'] as const;
 const spotifyTopItemsLimit = 50;
-const spotifyArtistLookupBatchSize = 50;
 type SpotifyTimeRange = (typeof spotifyTimeRanges)[number];
 
 type SpotifyArtist = {
   id: string;
   name: string;
-  genres?: string[];
   images?: { url: string }[];
 };
 
@@ -33,16 +31,6 @@ type SpotifyTrack = {
 
 type SpotifyPagingResponse<T> = {
   items: T[];
-};
-
-type SpotifyArtistsLookupResponse = {
-  artists: SpotifyArtist[];
-};
-
-type SpotifyClientCredentialsResponse = {
-  access_token: string;
-  token_type: string;
-  expires_in: number;
 };
 
 type SpotifyTopItemsByRange<T> = Record<SpotifyTimeRange, T[]>;
@@ -129,90 +117,6 @@ async function fetchSpotifyResource<T>(accessToken: string, url: string, fallbac
   });
 
   return parseSpotifyResponse<T>(response, fallbackMessage);
-}
-
-async function fetchSpotifyAppAccessToken() {
-  const basicAuth = Buffer.from(
-    `${env.SPOTIFY_CLIENT_ID}:${env.SPOTIFY_CLIENT_SECRET}`,
-    'utf8'
-  ).toString('base64');
-
-  const body = new URLSearchParams({
-    grant_type: 'client_credentials'
-  });
-
-  const response = await requestSpotify('https://accounts.spotify.com/api/token', {
-    method: 'POST',
-    headers: {
-      Authorization: `Basic ${basicAuth}`,
-      'Content-Type': 'application/x-www-form-urlencoded'
-    },
-    body
-  });
-
-  const tokenResponse = await parseSpotifyResponse<SpotifyClientCredentialsResponse>(
-    response,
-    'Spotify app token fetch failed.'
-  );
-
-  return tokenResponse.access_token;
-}
-
-async function fetchArtistsByIds(accessToken: string, artistIds: string[]) {
-  if (artistIds.length === 0) {
-    return [];
-  }
-
-  console.log('[spotify sync] artist ids for detail lookup:', artistIds);
-
-  const artists: SpotifyArtist[] = [];
-  for (let offset = 0; offset < artistIds.length; offset += spotifyArtistLookupBatchSize) {
-    const params = new URLSearchParams({
-      ids: artistIds.slice(offset, offset + spotifyArtistLookupBatchSize).join(',')
-    });
-    const response = await fetchSpotifyResource<SpotifyArtistsLookupResponse>(
-      accessToken,
-      `https://api.spotify.com/v1/artists?${params.toString()}`,
-      'Spotify artist details fetch failed.'
-    );
-    artists.push(...response.artists);
-  }
-  return artists;
-}
-
-function slugifyGenre(genre: string) {
-  return genre
-    .trim()
-    .toLowerCase()
-    .replace(/&/g, 'and')
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '');
-}
-
-function titleCaseGenre(genre: string) {
-  return genre
-    .split(/[\s-]+/)
-    .filter(Boolean)
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(' ');
-}
-
-function deriveTopGenres(artists: SpotifyArtist[], limit = 10) {
-  const genreCounts = new Map<string, number>();
-
-  for (const artist of artists) {
-    for (const genre of artist.genres ?? []) {
-      genreCounts.set(genre, (genreCounts.get(genre) ?? 0) + 1);
-    }
-  }
-
-  return [...genreCounts.entries()]
-    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
-    .slice(0, limit)
-    .map(([genre]) => ({
-      slug: slugifyGenre(genre),
-      label: titleCaseGenre(genre)
-    }));
 }
 
 export async function exchangeCodeForTokens(code: string): Promise<SpotifyTokenResponse> {
@@ -330,79 +234,9 @@ export async function syncTopMusicData(userId: string, accessToken: string): Pro
     {} as SpotifyTopItemsByRange<SpotifyTrack>
   );
 
-  const mediumTermArtists = topArtistsByRange.medium_term;
-  console.log(
-    '[spotify sync] top artists raw genres:',
-    mediumTermArtists.map((artist) => ({
-      id: artist.id,
-      name: artist.name,
-      genres: artist.genres ?? []
-    }))
-  );
-
-  let fullArtists: SpotifyArtist[] = [];
-
-  try {
-    const appAccessToken = await fetchSpotifyAppAccessToken();
-    const uniqueArtistIds = [
-      ...new Set(
-        Object.values(topArtistsByRange)
-          .flat()
-          .map((artist) => artist.id)
-      )
-    ];
-    fullArtists = await fetchArtistsByIds(
-      appAccessToken,
-      uniqueArtistIds
-    );
-  } catch (error) {
-    const enrichedError = error as Error & {
-      status?: number;
-      spotifyBody?: unknown;
-    };
-    console.warn(
-      'Spotify artist details lookup failed; continuing with top artists payload only.',
-      {
-        message: enrichedError.message,
-        status: enrichedError.status,
-        spotifyBody: enrichedError.spotifyBody
-      }
-    );
-  }
-
-  const fullArtistsById = new Map(fullArtists.map((artist) => [artist.id, artist]));
-  const normalizeArtist = (artist: SpotifyArtist) => {
-    const fullArtist = fullArtistsById.get(artist.id);
-
-    return {
-      ...artist,
-      genres: fullArtist?.genres ?? artist.genres ?? [],
-      images: fullArtist?.images ?? artist.images ?? []
-    };
-  };
-
-  const normalizedArtistsByRange = spotifyTimeRanges.reduce(
-    (accumulator, timeRange) => {
-      accumulator[timeRange] = topArtistsByRange[timeRange].map(normalizeArtist);
-      return accumulator;
-    },
-    {} as SpotifyTopItemsByRange<SpotifyArtist>
-  );
-
-  console.log(
-    '[spotify sync] normalized artist genres:',
-    normalizedArtistsByRange.medium_term.map((artist) => ({
-      id: artist.id,
-      name: artist.name,
-      genres: artist.genres ?? []
-    }))
-  );
-  const topGenres = deriveTopGenres(normalizedArtistsByRange.medium_term);
-  console.log('[spotify sync] derived top genres:', topGenres);
-
-  const uniqueNormalizedArtists = [
+  const uniqueArtists = [
     ...new Map(
-      Object.values(normalizedArtistsByRange)
+      Object.values(topArtistsByRange)
         .flat()
         .map((artist) => [artist.id, artist])
     ).values()
@@ -417,31 +251,20 @@ export async function syncTopMusicData(userId: string, accessToken: string): Pro
   ];
 
   await prisma.$transaction(async (tx) => {
-    await tx.userFavoriteGenre.deleteMany({ where: { userId } });
     await tx.userFavoriteArtist.deleteMany({ where: { userId } });
     await tx.userFavoriteTrack.deleteMany({ where: { userId } });
 
-    for (const genre of topGenres) {
-      await tx.genre.upsert({
-        where: { slug: genre.slug },
-        update: { label: genre.label },
-        create: genre
-      });
-    }
-
-    for (const artist of uniqueNormalizedArtists) {
+    for (const artist of uniqueArtists) {
       await tx.artist.upsert({
         where: { spotifyId: artist.id },
         update: {
           name: artist.name,
-          imageUrl: artist.images?.[0]?.url ?? null,
-          genres: artist.genres ?? []
+          imageUrl: artist.images?.[0]?.url ?? null
         },
         create: {
           spotifyId: artist.id,
           name: artist.name,
-          imageUrl: artist.images?.[0]?.url ?? null,
-          genres: artist.genres ?? []
+          imageUrl: artist.images?.[0]?.url ?? null
         }
       });
     }
@@ -467,22 +290,8 @@ export async function syncTopMusicData(userId: string, accessToken: string): Pro
       });
     }
 
-    for (const [index, genre] of topGenres.entries()) {
-      const savedGenre = await tx.genre.findUniqueOrThrow({
-        where: { slug: genre.slug }
-      });
-
-      await tx.userFavoriteGenre.create({
-        data: {
-          userId,
-          genreId: savedGenre.id,
-          rank: index + 1
-        }
-      });
-    }
-
     for (const timeRange of spotifyTimeRanges) {
-      for (const [index, artist] of normalizedArtistsByRange[timeRange].entries()) {
+      for (const [index, artist] of topArtistsByRange[timeRange].entries()) {
         const savedArtist = await tx.artist.findUniqueOrThrow({
           where: { spotifyId: artist.id }
         });

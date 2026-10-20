@@ -10,7 +10,6 @@ function shapeArtistEntry(
     spotifyId: entry.artist.spotifyId,
     name: entry.artist.name,
     imageUrl: entry.artist.imageUrl,
-    genres: entry.artist.genres,
     rank: entry.rank
   };
 }
@@ -72,12 +71,6 @@ export function shapeUserProfile(user: NonNullable<Awaited<ReturnType<typeof get
     })),
     createdAt: user.createdAt,
     updatedAt: user.updatedAt,
-    favoriteGenres: user.favoriteGenres.map((entry) => ({
-      id: entry.genre.id,
-      slug: entry.genre.slug,
-      label: entry.genre.label,
-      rank: entry.rank
-    })),
     favoriteArtists: mediumTermArtists.map(shapeArtistEntry),
     favoriteTracks: mediumTermTracks.map(shapeTrackEntry),
     favoriteArtistsByRange,
