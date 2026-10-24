@@ -9,6 +9,16 @@ process.env.SPOTIFY_CLIENT_ID ??= 'test-client';
 process.env.SPOTIFY_CLIENT_SECRET ??= 'test-secret';
 process.env.SPOTIFY_REDIRECT_URI ??= 'http://127.0.0.1:5000/api/auth/spotify/callback';
 
+test('Spotify login shows authorization again while preserving OAuth state', async () => {
+  const { buildSpotifyAuthorizeUrl } = await import('../src/services/spotifyService.js');
+  const state = createSpotifyAuthState();
+  const url = new URL(buildSpotifyAuthorizeUrl(state));
+  assert.equal(url.origin, 'https://accounts.spotify.com');
+  assert.equal(url.searchParams.get('show_dialog'), 'true');
+  assert.equal(url.searchParams.get('state'), state);
+  assert.equal(url.searchParams.get('response_type'), 'code');
+});
+
 for (const itemCount of [0, 7, 50]) {
   test(`music sync requests up to 50 items and persists ${itemCount} per range`, async (t) => {
     const service = await import('../src/services/spotifyService.js');

@@ -80,6 +80,7 @@ export function buildSpotifyAuthorizeUrl(state: string) {
   authUrl.searchParams.set('redirect_uri', env.SPOTIFY_REDIRECT_URI);
   authUrl.searchParams.set('scope', spotifyScopes.join(' '));
   authUrl.searchParams.set('state', state);
+  authUrl.searchParams.set('show_dialog', 'true');
 
   return authUrl.toString();
 }
