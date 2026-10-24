@@ -7,6 +7,7 @@ import {
   type SpotifyTimeRange
 } from '../lib/api';
 import ProfileActions from '../components/ProfileActions';
+import ProfileMessageButton from '../components/ProfileMessageButton';
 
 const tokenStorageKey = 'connectify_app_token';
 const timeRangeLabels: Record<SpotifyTimeRange, string> = {
@@ -122,6 +123,7 @@ export default function ProfilePage() {
   return (
     <div className="stack">
       {backButton}
+      {isViewingOtherProfile && <ProfileMessageButton key={profile.id} userId={profile.id} />}
       {!isViewingOtherProfile && (
         <div className="profile-toolbar">
           {location.state?.profileSaved ? <p role="status" className="profile-save-notice">Profile changes saved.</p> : <span />}

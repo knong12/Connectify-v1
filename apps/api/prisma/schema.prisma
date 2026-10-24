@@ -31,6 +31,9 @@ model User {
   followers            Follow[]            @relation("UserFollowers")
   favoriteArtists      UserFavoriteArtist[]
   favoriteTracks       UserFavoriteTrack[]
+  conversationsAsA     Conversation[]      @relation("ConversationMemberA")
+  conversationsAsB     Conversation[]      @relation("ConversationMemberB")
+  sentMessages         Message[]
 }
 
 model Follow {
@@ -93,4 +96,35 @@ model UserFavoriteTrack {
 
   @@unique([userId, trackId, timeRange])
   @@unique([userId, rank, timeRange])
+}
+
+model Conversation {
+  id          String   @id @default(uuid())
+  memberAId   String
+  memberBId   String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  memberA     User     @relation("ConversationMemberA", fields: [memberAId], references: [id], onDelete: Cascade)
+  memberB     User     @relation("ConversationMemberB", fields: [memberBId], references: [id], onDelete: Cascade)
+  messages    Message[]
+
+  @@unique([memberAId, memberBId])
+  @@index([memberAId, updatedAt])
+  @@index([memberBId, updatedAt])
+}
+
+model Message {
+  id                Int          @id @default(autoincrement())
+  conversationId    String
+  senderId          String
+  clientMessageId   String
+  body              String
+  createdAt         DateTime     @default(now())
+  readAt            DateTime?
+  conversation      Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender            User         @relation(fields: [senderId], references: [id], onDelete: Cascade)
+
+  @@unique([senderId, clientMessageId])
+  @@index([conversationId, id])
+  @@index([conversationId, readAt])
 }

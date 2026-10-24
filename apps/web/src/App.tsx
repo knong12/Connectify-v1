@@ -4,6 +4,8 @@ import HomePage from './pages/HomePage';
 import MatchesPage from './pages/MatchesPage';
 import ProfilePage from './pages/ProfilePage';
 import EditProfilePage from './pages/EditProfilePage';
+import MessagesPage from './pages/MessagesPage';
+import { MessagingProvider, MessagesNavLink } from './components/MessagingProvider';
 
 const themeStorageKey = 'connectify_theme';
 
@@ -82,6 +84,7 @@ export default function App() {
   }
 
   return (
+    <MessagingProvider token={isSignedIn ? localStorage.getItem('connectify_app_token') : null}>
     <div className="app-shell">
       <header className="topbar">
         <div>
@@ -91,6 +94,7 @@ export default function App() {
           <NavLink to="/">Home</NavLink>
           <NavLink to="/profile">Profile</NavLink>
           <NavLink to="/matches">Matches</NavLink>
+          {isSignedIn && <MessagesNavLink />}
           <button
             className="theme-toggle"
             type="button"
@@ -116,8 +120,11 @@ export default function App() {
           <Route path="/profile/edit" element={<EditProfilePage />} />
           <Route path="/profile/:userId" element={<ProfilePage />} />
           <Route path="/matches" element={<MatchesPage />} />
+          <Route path="/messages" element={<MessagesPage />} />
+          <Route path="/messages/:conversationId" element={<MessagesPage />} />
         </Routes>
       </main>
     </div>
+    </MessagingProvider>
   );
 }

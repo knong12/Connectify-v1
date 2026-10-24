@@ -1,5 +1,8 @@
 import cors from 'cors';
 import express from 'express';
+import { createServer } from 'node:http';
+import { createMessagingServer } from './realtime/messaging.js';
+import { createConversationRoutes } from './routes/conversations.js';
 import { env } from './config/env.js';
 import authRoutes from './routes/auth.js';
 import followRoutes from './routes/follows.js';
@@ -9,6 +12,8 @@ import meRoutes from './routes/me.js';
 import usersRoutes from './routes/users.js';
 
 const app = express();
+const server = createServer(app);
+const messaging = createMessagingServer(server);
 
 app.use(
   cors({
@@ -24,6 +29,9 @@ app.use('/api/follows', followRoutes);
 app.use('/api/me', meRoutes);
 app.use('/api/matches', matchesRoutes);
 app.use('/api/users', usersRoutes);
+app.use('/api/conversations', createConversationRoutes((users, event, payload) => {
+  messaging.to(users.map((id) => `user:${id}`)).emit(event, payload);
+}));
 
 app.use((error: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
   res.status(500).json({
@@ -32,6 +40,6 @@ app.use((error: unknown, _req: express.Request, res: express.Response, _next: ex
   });
 });
 
-app.listen(env.PORT, () => {
+server.listen(env.PORT, () => {
   console.log(`connectify-api listening on http://127.0.0.1:${env.PORT}`);
 });
