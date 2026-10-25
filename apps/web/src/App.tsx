@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { NavLink, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import HomePage from './pages/HomePage';
 import MatchesPage from './pages/MatchesPage';
+import MixPage from './pages/MixPage';
 import ProfilePage from './pages/ProfilePage';
 import EditProfilePage from './pages/EditProfilePage';
 import MessagesPage from './pages/MessagesPage';
@@ -120,6 +121,7 @@ export default function App() {
           <Route path="/profile/edit" element={<EditProfilePage />} />
           <Route path="/profile/:userId" element={<ProfilePage />} />
           <Route path="/matches" element={<MatchesPage />} />
+          <Route path="/mix/:userId" element={<MixPage />} />
           <Route path="/messages" element={<MessagesPage />} />
           <Route path="/messages/:conversationId" element={<MessagesPage />} />
         </Routes>

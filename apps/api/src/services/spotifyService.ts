@@ -5,7 +5,8 @@ import type { SpotifyProfile, SpotifyTokenResponse } from '../types/auth.js';
 const spotifyScopes = [
   'user-read-email',
   'user-read-private',
-  'user-top-read'
+  'user-top-read',
+  'playlist-modify-public'
 ];
 
 const spotifyTimeRanges = ['short_term', 'medium_term', 'long_term'] as const;
@@ -166,6 +167,46 @@ export async function refreshSpotifyTokens(refreshToken: string): Promise<Spotif
     body: new URLSearchParams({ grant_type: 'refresh_token', refresh_token: refreshToken })
   });
   return parseSpotifyResponse<SpotifyTokenResponse>(response, 'Spotify refresh failed.');
+}
+
+// Only used for the playlist owned by the signed-in user, never for a match's credentials.
+export async function spotifyPlaylistRequest<T>(userId: string, path: string, options: RequestInit = {}): Promise<T> {
+  const user = await prisma.user.findUnique({ where: { id: userId }, select: {
+    spotifyAccessToken: true, spotifyRefreshToken: true, spotifyScopes: true
+  } });
+  if (!user?.spotifyAccessToken) throw new SpotifyRequestError('reconnect', 401);
+  if (!user.spotifyScopes.includes('playlist-modify-public')) {
+    throw new SpotifyRequestError('permission_required', 403);
+  }
+  const request = async (token: string) => parseSpotifyResponse<T>(await requestSpotify(`https://api.spotify.com/v1${path}`, {
+    ...options, headers: { ...options.headers, Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }
+  }), 'Playlist request failed.');
+  try {
+    return await request(user.spotifyAccessToken);
+  } catch (error) {
+    if (!(error instanceof SpotifyRequestError) || error.status !== 401) throw error;
+  }
+  if (!user.spotifyRefreshToken) throw new SpotifyRequestError('reconnect', 401);
+  let tokens: SpotifyTokenResponse;
+  try { tokens = await refreshSpotifyTokens(user.spotifyRefreshToken); }
+  catch (error) {
+    if (error instanceof SpotifyRequestError && error.code === 'invalid_grant') {
+      await prisma.user.update({ where: { id: userId }, data: {
+        spotifyAccessToken: null, spotifyRefreshToken: null, spotifyConnected: false, spotifyScopes: []
+      } });
+    }
+    throw error;
+  }
+  await prisma.user.update({ where: { id: userId }, data: {
+    spotifyAccessToken: tokens.access_token,
+    spotifyRefreshToken: tokens.refresh_token ?? user.spotifyRefreshToken,
+    ...(tokens.scope ? { spotifyScopes: tokens.scope.split(/\s+/).filter(Boolean) } : {})
+  } });
+  const refreshedScopes = tokens.scope === undefined ? user.spotifyScopes : tokens.scope.split(/\s+/).filter(Boolean);
+  if (!refreshedScopes.includes('playlist-modify-public')) {
+    throw new SpotifyRequestError('permission_required', 403);
+  }
+  return request(tokens.access_token);
 }
 
 export async function syncUserMusicData(userId: string): Promise<void> {

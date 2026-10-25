@@ -22,7 +22,8 @@ export async function upsertUserFromSpotify(
       spotifyProfileImage: profile.images[0]?.url ?? null,
       spotifyAccessToken: tokens.access_token,
       spotifyRefreshToken: tokens.refresh_token ?? undefined,
-      spotifyConnected: true
+      spotifyConnected: true,
+      spotifyScopes: tokens.scope?.split(/\s+/).filter(Boolean) ?? []
     },
     create: {
       email: profile.email,
@@ -31,7 +32,8 @@ export async function upsertUserFromSpotify(
       spotifyProfileImage: profile.images[0]?.url ?? null,
       spotifyAccessToken: tokens.access_token,
       spotifyRefreshToken: tokens.refresh_token ?? null,
-      spotifyConnected: true
+      spotifyConnected: true,
+      spotifyScopes: tokens.scope?.split(/\s+/).filter(Boolean) ?? []
     }
   });
 }

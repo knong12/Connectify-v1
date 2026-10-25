@@ -25,6 +25,7 @@ model User {
   spotifyAccessToken   String?
   spotifyRefreshToken  String?
   spotifyConnected     Boolean             @default(false)
+  spotifyScopes        String[]            @default([])
   createdAt            DateTime            @default(now())
   updatedAt            DateTime            @updatedAt
   following            Follow[]            @relation("UserFollowing")
@@ -34,6 +35,8 @@ model User {
   conversationsAsA     Conversation[]      @relation("ConversationMemberA")
   conversationsAsB     Conversation[]      @relation("ConversationMemberB")
   sentMessages         Message[]
+  ownedMixes           MixSave[]           @relation("MixOwner")
+  featuredMixes        MixSave[]           @relation("MixTarget")
 }
 
 model Follow {
@@ -127,4 +130,20 @@ model Message {
   @@unique([senderId, clientMessageId])
   @@index([conversationId, id])
   @@index([conversationId, readAt])
+}
+
+model MixSave {
+  id                String   @id
+  ownerId           String
+  targetUserId      String
+  name              String
+  trackIds          String[]
+  status            String   @default("prepared")
+  spotifyPlaylistId String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  owner             User     @relation("MixOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  target            User     @relation("MixTarget", fields: [targetUserId], references: [id], onDelete: Cascade)
+
+  @@index([ownerId, createdAt])
 }

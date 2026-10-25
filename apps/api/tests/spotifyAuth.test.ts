@@ -17,6 +17,10 @@ test('Spotify login shows authorization again while preserving OAuth state', asy
   assert.equal(url.searchParams.get('show_dialog'), 'true');
   assert.equal(url.searchParams.get('state'), state);
   assert.equal(url.searchParams.get('response_type'), 'code');
+  const scopes = url.searchParams.get('scope')!.split(' ');
+  assert.ok(scopes.includes('playlist-modify-public'));
+  assert.equal(scopes.includes('playlist-modify-private'), false);
+  assert.equal(scopes.includes('playlist-read-private'), false);
 });
 
 for (const itemCount of [0, 7, 50]) {

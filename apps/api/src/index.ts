@@ -10,6 +10,7 @@ import healthRoutes from './routes/health.js';
 import matchesRoutes from './routes/matches.js';
 import meRoutes from './routes/me.js';
 import usersRoutes from './routes/users.js';
+import mixRoutes from './routes/mixes.js';
 
 const app = express();
 const server = createServer(app);
@@ -29,6 +30,7 @@ app.use('/api/follows', followRoutes);
 app.use('/api/me', meRoutes);
 app.use('/api/matches', matchesRoutes);
 app.use('/api/users', usersRoutes);
+app.use('/api/mixes', mixRoutes);
 app.use('/api/conversations', createConversationRoutes((users, event, payload) => {
   messaging.to(users.map((id) => `user:${id}`)).emit(event, payload);
 }));

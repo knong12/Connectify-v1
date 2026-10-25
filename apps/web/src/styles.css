@@ -1138,3 +1138,55 @@ code {
     height: 108px;
   }
 }
+
+/* Joint mix */
+.mix-page { --mix-line: #cbd5cf; --mix-muted: #516359; --mix-soft: #edf4ef; --mix-green: #15743a; width: 100%; max-width: 780px; margin-inline: auto; min-width: 0; }
+:root[data-theme="dark"] .mix-page { --mix-line: #4b5b50; --mix-muted: #bdcbbf; --mix-soft: #27362c; --mix-green: #94e5af; }
+.mix-page h2 { font-size: 1.8rem; margin: 0.5rem 0 1rem; overflow-wrap: anywhere; }
+.mix-page p { line-height: 1.6; overflow-wrap: anywhere; }
+.mix-page .mix-muted { color: var(--mix-muted); font-size: 0.85rem; }
+.mix-back, .mix-meta, .mix-toolbar h3 { display: flex; align-items: center; gap: 0.5rem; }
+.mix-back { width: fit-content; font-size: 0.9rem; }
+.mix-meta { color: var(--mix-muted); font-size: 0.85rem; align-items: start; }
+.mix-meta svg { flex: 0 0 16px; margin-top: 4px; }
+.mix-editor { display: grid; gap: 0.5rem; min-width: 0; }
+.mix-editor label { font-weight: 600; font-size: 0.9rem; }
+.mix-editor input { width: 100%; min-width: 0; padding: 0.75rem; border: 1px solid var(--mix-line); border-radius: 6px; font: inherit; background: transparent; color: inherit; }
+.mix-editor > span { text-align: right; }
+.mix-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; flex-wrap: wrap; }
+.mix-toolbar h3 { font-size: 1rem; margin: 0; flex-wrap: wrap; }
+.mix-page .button { display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem; min-height: 44px; margin: 0; border-radius: 6px; font-size: 0.9rem; white-space: normal; text-align: center; max-width: 100%; }
+.mix-page .button:not(.button-ghost):not(.button-secondary) { background: #15743a; color: #fff; }
+.mix-page button:disabled { opacity: 0.55; cursor: not-allowed; }
+.mix-tracks { margin: 0; padding: 0; list-style: none; border-top: 1px solid var(--mix-line); }
+.mix-tracks > li { display: grid; grid-template-columns: minmax(0, 1fr) 44px; gap: 0.5rem 0.75rem; padding: 1rem 0; border-bottom: 1px solid var(--mix-line); }
+.mix-track-link { display: flex; align-items: center; gap: 0.75rem; min-width: 0; }
+.mix-track-link img, .mix-art-fallback { width: 56px; height: 56px; flex: 0 0 56px; }
+.mix-track-link img { object-fit: contain; }
+.mix-art-fallback { display: grid; place-items: center; background: var(--mix-soft); }
+.mix-track-link > span:not(.mix-art-fallback) { display: grid; gap: 0.25rem; min-width: 0; overflow-wrap: anywhere; font-size: 0.95rem; }
+.mix-track-link > svg { flex: 0 0 16px; margin-left: auto; }
+.mix-track-link:hover strong { text-decoration: underline; }
+.mix-remove { display: grid; place-items: center; width: 44px; height: 44px; padding: 0; border: 1px solid var(--mix-line); border-radius: 6px; color: inherit; background: transparent; cursor: pointer; }
+.mix-reason { grid-column: 1 / -1; margin: 0; color: var(--mix-muted); font-size: 0.85rem; }
+.mix-reason strong { margin-right: 0.4rem; color: var(--mix-green); }
+.mix-reason strong[data-source="them"] { color: #a14826; }
+:root[data-theme="dark"] .mix-reason strong[data-source="them"] { color: #ffc094; }
+.mix-reason strong[data-source="shared"] { color: #256f89; }
+:root[data-theme="dark"] .mix-reason strong[data-source="shared"] { color: #92d9ef; }
+.mix-credit { color: var(--mix-muted); font-size: 0.8rem; }
+.mix-credit a, .mix-notice a:not(.button), .mix-save a:not(.button) { text-decoration: underline; overflow-wrap: anywhere; }
+.mix-notice { border-left: 3px solid var(--mix-green); padding: 0.5rem 1rem; background: var(--mix-soft); }
+.mix-notice p:first-child { margin-top: 0; }
+.mix-notice p:last-child { margin-bottom: 0; }
+.mix-error { border-color: #b42336; }
+.mix-save { border-top: 1px solid var(--mix-line); padding-top: 1.25rem; }
+.mix-save > div > p > svg { vertical-align: middle; }
+.mix-page :is(a, button, input):focus-visible { outline: 2px solid var(--mix-green); outline-offset: 3px; }
+@media (max-width: 440px) {
+  .mix-page h2 { font-size: 1.5rem; }
+  .mix-tracks > li { gap: 0.5rem; }
+  .mix-track-link { gap: 0.5rem; }
+  .mix-track-link img, .mix-art-fallback { width: 44px; height: 44px; flex-basis: 44px; }
+  .mix-toolbar { align-items: start; flex-direction: column; }
+}

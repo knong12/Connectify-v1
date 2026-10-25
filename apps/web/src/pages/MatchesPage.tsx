@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { ListMusic } from 'lucide-react';
 import {
   fetchMatches,
   followUser,
@@ -250,6 +251,9 @@ export default function MatchesPage() {
               <div className="match-actions">
                 <Link className="button button-ghost" to={`/profile/${match.userId}`}>
                   View profile
+                </Link>
+                <Link className="button button-ghost" to={`/mix/${encodeURIComponent(match.userId)}`}>
+                  <ListMusic size={16} aria-hidden="true" /> Create a mix
                 </Link>
                 <button
                   className={match.isFollowing ? 'button button-secondary' : 'button'}
