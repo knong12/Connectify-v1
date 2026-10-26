@@ -1,277 +1,178 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ListMusic } from 'lucide-react';
-import {
-  fetchMatches,
-  followUser,
-  type MatchesResponse,
-  unfollowUser
-} from '../lib/api';
+import { ArrowLeft, ArrowRight, ArrowUpRight, ChevronDown, Headphones, Info, ListMusic, Music2, UserCheck, UserPlus } from 'lucide-react';
+import { fetchMatches, followUser, type MatchesResponse, type SharedMusicItem, unfollowUser } from '../lib/api';
 
-const tokenStorageKey = 'connectify_app_token';
-
-type MatchLoadState =
-  | { status: 'idle' }
-  | { status: 'loading' }
-  | { status: 'error'; message: string }
-  | { status: 'ready'; matches: MatchesResponse['matches'] };
-
-function getStoredToken() {
-  return localStorage.getItem(tokenStorageKey);
+type Match = MatchesResponse['matches'][number];
+type LoadState = { status: 'loading' } | { status: 'error'; message: string } |
+  { status: 'ready'; matches: Match[] };
+const windows = { short_term: 'Recent', medium_term: '6 months', long_term: '1 year' } as const;
+function matchSummary(match: Match) {
+  const explanation = match.explanation;
+  if (explanation.status === 'insufficient_data') return 'One of you has no synced music yet. Shared favorites will appear when both profiles have listening data.';
+  const artists = explanation.sharedArtists.slice(0, 2).map((item) => item.name);
+  if (artists.length) return `You both listen to ${artists.join(' and ')}.`;
+  const track = explanation.sharedTracks[0];
+  if (track) return `You both have ${track.name} in your top tracks.`;
+  return 'No shared favorites in your synced top lists yet. Explore their profile to discover something new.';
 }
 
-function joinPreview(values: string[]) {
-  return values.filter(Boolean).join(', ');
+function Evidence({ items, kind }: { items: SharedMusicItem[]; kind: 'artists' | 'tracks' }) {
+  if (!items.length) return <p className="muted overlap-empty">No shared {kind} in the synced lists.</p>;
+  return <ul className="overlap-evidence-list">
+    {items.map((item) => <li key={item.spotifyId}>
+      <a href={`https://open.spotify.com/${kind === 'artists' ? 'artist' : 'track'}/${encodeURIComponent(item.spotifyId)}`}
+        target="_blank" rel="noreferrer" className="overlap-music-link" title={`Open ${item.name} in Spotify`}>
+        {item.imageUrl ? <img src={item.imageUrl} alt="" loading="lazy" /> : <span className="overlap-art-fallback"><Music2 size={18} /></span>}
+        <span>{item.name}</span><ArrowUpRight size={14} aria-hidden="true" />
+      </a>
+      <div className="overlap-ranks">
+        {item.windows.length ? item.windows.map((window) => <span key={window.timeRange}>
+          {windows[window.timeRange]} <strong>#{window.yourRank}</strong> you / <strong>#{window.theirRank}</strong> them
+        </span>) : <span>Appears in both profiles at different listening windows</span>}
+      </div>
+    </li>)}
+  </ul>;
 }
 
-function getMatchTier(score: number) {
-  if (score >= 70) {
-    return 'Strong overlap';
-  }
+function MatchCard({ match, pending, error, onFollow }: {
+  match: Match; pending: boolean; error?: string; onFollow: () => void;
+}) {
+  const [musicKind, setMusicKind] = useState<'artists' | 'tracks'>(match.sharedArtists > 0 ? 'artists' : 'tracks');
+  const { explanation } = match;
+  const ready = explanation.status === 'ready';
+  const samples = [...explanation.sharedArtists, ...explanation.sharedTracks].slice(0, 3);
+  return <article className="card overlap-card" aria-label={`Music connection with ${match.displayName}`}>
+    <header className="overlap-card-header">
+      <Link to={`/profile/${encodeURIComponent(match.userId)}`} className="overlap-person">
+        {match.spotifyProfileImage ? <img src={match.spotifyProfileImage} className="overlap-avatar" alt="" /> :
+          <span className="overlap-avatar overlap-avatar-fallback">{match.displayName.slice(0, 1).toUpperCase()}</span>}
+        <div><h3>{match.displayName}</h3><span className="muted">{match.isFollowing ? 'Following' : 'Music connection'}</span></div>
+      </Link>
+    </header>
 
-  if (score >= 40) {
-    return 'Worth exploring';
-  }
+    <div className="overlap-summary">
+      <h4>What connects you</h4><p>{matchSummary(match)}</p>
+      <div className="overlap-counts"><span><Headphones size={15} aria-hidden="true" />{match.sharedArtists} shared {match.sharedArtists === 1 ? 'artist' : 'artists'}</span>
+        <span><Music2 size={15} aria-hidden="true" />{match.sharedTracks} shared {match.sharedTracks === 1 ? 'track' : 'tracks'}</span></div>
+      {samples.length > 0 && <p className="overlap-sample-names">{samples.map((item) => item.name).join(' · ')}</p>}
+    </div>
 
-  return 'Early discovery';
-}
+    {explanation.limitedData && <p className="overlap-data-note"><Info size={16} aria-hidden="true" />
+      {ready ? 'Some listening data is missing, so there may be more music you share.' : 'Both people need synced listening data to find shared favorites.'}
+    </p>}
 
-function getMatchExplanation(match: MatchesResponse['matches'][number]) {
-  if (match.sharedArtists > 0 && match.sharedTracks > 0) {
-    return `You already overlap on ${match.sharedArtists} artist${match.sharedArtists === 1 ? '' : 's'} and ${match.sharedTracks} track${match.sharedTracks === 1 ? '' : 's'}.`;
-  }
+    <details className="overlap-disclosure">
+      <summary>Explore shared music <span className="overlap-disclosure-count">{match.sharedArtists + match.sharedTracks}</span><ChevronDown size={16} aria-hidden="true" /></summary>
+      <div className="overlap-kind-tabs" role="group" aria-label="Shared music type">
+        <button type="button" aria-pressed={musicKind === 'artists'} onClick={() => setMusicKind('artists')}><Headphones size={15} />Artists ({match.sharedArtists})</button>
+        <button type="button" aria-pressed={musicKind === 'tracks'} onClick={() => setMusicKind('tracks')}><Music2 size={15} />Tracks ({match.sharedTracks})</button>
+      </div>
+      <Evidence items={musicKind === 'artists' ? explanation.sharedArtists : explanation.sharedTracks} kind={musicKind} />
+      <p className="overlap-spotify-credit">Music data and artwork from <a href="https://open.spotify.com" target="_blank" rel="noreferrer">Spotify</a>.</p>
+    </details>
 
-  if (match.sharedArtists > 0) {
-    return `This recommendation is being driven mostly by artist taste, with ${match.sharedArtists} shared favorite artist${match.sharedArtists === 1 ? '' : 's'}.`;
-  }
-
-  if (match.sharedTracks > 0) {
-    return `This card is showing up because you both saved ${match.sharedTracks} of the same track${match.sharedTracks === 1 ? '' : 's'}.`;
-  }
-
-  return 'There is no direct overlap yet, but this person is still being surfaced as a discovery candidate for the current demo.';
+    {match.bio && <p className="overlap-profile-note">{match.bio}</p>}
+    {match.favoriteArtistNote && <p className="overlap-profile-note"><strong>In their rotation:</strong> {match.favoriteArtistNote}</p>}
+    <footer className="overlap-actions">
+      <Link to={`/mix/${encodeURIComponent(match.userId)}`} className="button button-ghost"><ListMusic size={16} aria-hidden="true" />Create a mix</Link>
+      <Link to={`/profile/${encodeURIComponent(match.userId)}`} className="button button-ghost">View profile<ArrowUpRight size={16} aria-hidden="true" /></Link>
+      <button className={match.isFollowing ? 'button button-secondary' : 'button'} type="button" disabled={pending} onClick={onFollow}>
+        {match.isFollowing ? <UserCheck size={16} aria-hidden="true" /> : <UserPlus size={16} aria-hidden="true" />}
+        {pending ? 'Updating...' : match.isFollowing ? 'Unfollow' : 'Follow'}
+      </button>
+    </footer>
+    {error && <p role="alert" className="overlap-action-error">{error}</p>}
+  </article>;
 }
 
 export default function MatchesPage() {
-  const [state, setState] = useState<MatchLoadState>({ status: 'idle' });
-  const [pendingUserId, setPendingUserId] = useState<string | null>(null);
+  const [state, setState] = useState<LoadState>({ status: 'loading' });
+  const [pending, setPending] = useState<Set<string>>(() => new Set());
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const carousel = useRef<HTMLDivElement>(null);
+  const [scrollable, setScrollable] = useState({ previous: false, next: false });
+  const matchCount = state.status === 'ready' ? state.matches.length : 0;
 
   useEffect(() => {
-    const token = getStoredToken();
+    const element = carousel.current;
+    if (!element) return;
+    const update = () => setScrollable({
+      previous: element.scrollLeft > 2,
+      next: element.scrollLeft + element.clientWidth < element.scrollWidth - 2
+    });
+    update();
+    element.addEventListener('scroll', update, { passive: true });
+    const observer = new ResizeObserver(update);
+    observer.observe(element);
+    return () => { element.removeEventListener('scroll', update); observer.disconnect(); };
+  }, [matchCount]);
 
+  function scrollMatches(direction: -1 | 1) {
+    const element = carousel.current;
+    const card = element?.firstElementChild;
+    if (!element || !(card instanceof HTMLElement)) return;
+    const gap = parseFloat(getComputedStyle(element).columnGap) || 0;
+    element.scrollBy({ left: direction * (card.offsetWidth + gap),
+      behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+  }
+  useEffect(() => {
+    let cancelled = false;
+    const token = localStorage.getItem('connectify_app_token');
     if (!token) {
-      setState({
-        status: 'error',
-        message: 'Log in with Spotify first so Connectify can compare your saved music profile.'
-      });
+      setState({ status: 'error', message: 'Sign in with Spotify to view your music connections.' });
       return;
     }
-
-    setState({ status: 'loading' });
-
-    fetchMatches(token)
-      .then((data) => {
-        setState({
-          status: 'ready',
-          matches: data.matches
-        });
-      })
-      .catch((error) => {
-        setState({
-          status: 'error',
-          message: error instanceof Error ? error.message : 'Failed to load matches.'
-        });
-      });
+    fetchMatches(token).then((data) => {
+      if (!cancelled) setState({ status: 'ready', matches: data.matches });
+    }).catch(() => {
+      if (!cancelled) setState({ status: 'error', message: 'Could not load matches. Please refresh or sign in again.' });
+    });
+    return () => { cancelled = true; };
   }, []);
 
-  if (state.status === 'idle' || state.status === 'loading') {
-    return (
-      <section className="card">
-        <h2>Matches</h2>
-        <p>Loading compatibility results from your saved music profile...</p>
-      </section>
-    );
-  }
-
-  if (state.status === 'error') {
-    return (
-      <section className="card">
-        <h2>Matches</h2>
-        <p>{state.message}</p>
-      </section>
-    );
-  }
-
-  if (state.matches.length === 0) {
-    return (
-      <section className="card">
-        <h2>Matches</h2>
-        <p>
-          No matches have been found yet. Add more synced users to the system so Connectify can
-          compare artist and track overlap.
-        </p>
-      </section>
-    );
-  }
-
-  async function handleFollowToggle(targetUserId: string, isFollowing: boolean) {
-    const token = getStoredToken();
-
-    if (!token || state.status !== 'ready') {
-      return;
-    }
-
-    setPendingUserId(targetUserId);
-
+  async function handleFollow(match: Match) {
+    const token = localStorage.getItem('connectify_app_token');
+    if (!token) { setErrors((previous) => ({ ...previous, [match.userId]: 'Please sign in again.' })); return; }
+    if (pending.has(match.userId)) return;
+    setPending((previous) => new Set(previous).add(match.userId));
+    setErrors((previous) => ({ ...previous, [match.userId]: '' }));
     try {
-      if (isFollowing) {
-        await unfollowUser(token, targetUserId);
-      } else {
-        await followUser(token, targetUserId);
-      }
-
-      setState({
-        status: 'ready',
-        matches: state.matches.map((match) =>
-          match.userId === targetUserId ? { ...match, isFollowing: !isFollowing } : match
-        )
+      await (match.isFollowing ? unfollowUser(token, match.userId) : followUser(token, match.userId));
+      setState((previous) => previous.status !== 'ready' ? previous : {
+        ...previous, matches: previous.matches.map((entry) => entry.userId === match.userId ? { ...entry, isFollowing: !match.isFollowing } : entry)
       });
-    } catch (error) {
-      setState({
-        status: 'error',
-        message: error instanceof Error ? error.message : 'Failed to update follow state.'
-      });
+    } catch {
+      setErrors((previous) => ({ ...previous, [match.userId]: 'Could not update following. Please try again.' }));
     } finally {
-      setPendingUserId(null);
+      setPending((previous) => { const next = new Set(previous); next.delete(match.userId); return next; });
     }
   }
 
-  return (
-    <div className="stack">
-      <section className="card matches-hero">
-        <div className="matches-hero-copy">
-          <p className="eyebrow">Compatibility View</p>
-          <h2>People with a similar listening profile</h2>
-          <p>
-            Connectify compares your saved artists and tracks, then surfaces people who feel
-            closest to your current music identity.
-          </p>
-        </div>
-        <div className="pill-row">
-          <span className="pill">Artist overlap</span>
-          <span className="pill">Track overlap</span>
-          <span className="pill">Follow suggestions</span>
-          <span className="pill pill-success">Ranked results</span>
-        </div>
-      </section>
-
-      <section className="matches-grid">
-        {state.matches.map((match) => {
-          const tier = getMatchTier(match.score);
-          const explanation = getMatchExplanation(match);
-
-          return (
-            <article className="card match-card" key={match.userId}>
-              <div className="match-header">
-                <div className="match-identity">
-                  {match.spotifyProfileImage ? (
-                    <img
-                      alt={`${match.displayName} Spotify profile`}
-                      className="avatar"
-                      src={match.spotifyProfileImage}
-                    />
-                  ) : (
-                    <div className="avatar avatar-fallback">{match.displayName.slice(0, 1)}</div>
-                  )}
-                  <div>
-                    <p className="eyebrow">Potential Match</p>
-                    <h3>{match.displayName}</h3>
-                    <div className="pill-row match-meta-row">
-                      <span className="pill">{tier}</span>
-                      {match.isFollowing ? (
-                        <span className="pill pill-success">Following</span>
-                      ) : null}
-                    </div>
-                  </div>
-                </div>
-                <div className="score-badge">
-                  <span>Score</span>
-                  <strong>{match.score}</strong>
-                </div>
-              </div>
-
-              <div className="match-story">
-                <p className="match-story-lead">Why this match appeared</p>
-                <p className="muted">{explanation}</p>
-              </div>
-
-              <div className="match-stats-grid">
-                <div className="stat">
-                  <span className="stat-label">Shared Artists</span>
-                  <strong>{match.sharedArtists}</strong>
-                </div>
-                <div className="stat">
-                  <span className="stat-label">Shared Tracks</span>
-                  <strong>{match.sharedTracks}</strong>
-                </div>
-              </div>
-
-              <div className="match-social-block">
-                {match.bio ? <p className="match-bio">{match.bio}</p> : null}
-                {match.favoriteArtistNote ? (
-                  <p className="match-note">
-                    <span>Favorite artist highlight:</span> {match.favoriteArtistNote}
-                  </p>
-                ) : (
-                  <p className="match-note match-note-muted">
-                    No profile note added yet, so this card is leaning fully on music overlap.
-                  </p>
-                )}
-              </div>
-
-              <div className="match-details">
-                <div className="match-detail-panel">
-                  <p className="eyebrow">Artist Overlap</p>
-                  <p className="muted">
-                    {match.sharedArtistNames.length > 0
-                      ? joinPreview(match.sharedArtistNames)
-                      : 'No shared artists yet'}
-                  </p>
-                </div>
-                <div className="match-detail-panel">
-                  <p className="eyebrow">Track Overlap</p>
-                  <p className="muted">
-                    {match.sharedTrackNames.length > 0
-                      ? joinPreview(match.sharedTrackNames)
-                      : 'No shared tracks yet'}
-                  </p>
-                </div>
-              </div>
-
-              <div className="match-actions">
-                <Link className="button button-ghost" to={`/profile/${match.userId}`}>
-                  View profile
-                </Link>
-                <Link className="button button-ghost" to={`/mix/${encodeURIComponent(match.userId)}`}>
-                  <ListMusic size={16} aria-hidden="true" /> Create a mix
-                </Link>
-                <button
-                  className={match.isFollowing ? 'button button-secondary' : 'button'}
-                  disabled={pendingUserId === match.userId}
-                  onClick={() => handleFollowToggle(match.userId, match.isFollowing)}
-                  type="button"
-                >
-                  {pendingUserId === match.userId
-                    ? 'Updating...'
-                    : match.isFollowing
-                      ? 'Following'
-                      : 'Follow'}
-                </button>
-              </div>
-            </article>
-          );
-        })}
-      </section>
-    </div>
-  );
+  return <div className="stack overlap-page">
+    <header className="overlap-page-header">
+      <div><p className="eyebrow">People & music</p><h2>Your listening connections</h2></div>
+      {state.status === 'ready' && <span className="overlap-result-count">{state.matches.length} profiles</span>}
+    </header>
+    <p className="overlap-page-intro">Find your common ground through the artists and tracks you both love.</p>
+    {state.status === 'loading' && <p role="status">Comparing listening profiles...</p>}
+    {state.status === 'error' && <p role="alert">{state.message} <Link to="/">Go to sign in</Link></p>}
+    {state.status === 'ready' && (state.matches.length ? <section className="overlap-carousel" aria-label="Music matches">
+      <div className="overlap-carousel-controls">
+        <button type="button" className="overlap-scroll-button" aria-label="Previous connections" title="Previous connections"
+          aria-controls="match-cards" disabled={!scrollable.previous} onClick={() => scrollMatches(-1)}><ArrowLeft size={20} aria-hidden="true" /></button>
+        <button type="button" className="overlap-scroll-button" aria-label="Next connections" title="Next connections"
+          aria-controls="match-cards" disabled={!scrollable.next} onClick={() => scrollMatches(1)}><ArrowRight size={20} aria-hidden="true" /></button>
+      </div>
+      <div id="match-cards" className="overlap-carousel-track" ref={carousel} tabIndex={0} role="region" aria-label="Listening connections"
+        onKeyDown={(event) => {
+          if (event.target !== event.currentTarget) return;
+          if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
+            event.preventDefault(); scrollMatches(event.key === 'ArrowLeft' ? -1 : 1);
+          }
+        }}>
+        {state.matches.map((match) => <MatchCard key={match.userId} match={match} pending={pending.has(match.userId)} error={errors[match.userId]} onFollow={() => handleFollow(match)} />)}
+      </div>
+    </section> : <p>No other profiles to compare yet. Invite another listener to Connectify.</p>)}
+  </div>;
 }

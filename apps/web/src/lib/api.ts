@@ -55,6 +55,26 @@ export type ProfileResponse = {
   };
 };
 
+export type SharedMusicItem = {
+  spotifyId: string;
+  name: string;
+  imageUrl: string | null;
+  windows: { timeRange: SpotifyTimeRange; yourRank: number; theirRank: number }[];
+};
+
+export type MatchSignal = {
+  kind: 'artists' | 'tracks';
+  timeRange: SpotifyTimeRange;
+  yourCount: number;
+  theirCount: number;
+  sharedCount: number;
+  unionCount: number;
+  similarity: number;
+  baseWeight: number;
+  maxPoints: number;
+  contribution: number;
+};
+
 export type MatchesResponse = {
   matches: {
     userId: string;
@@ -69,6 +89,15 @@ export type MatchesResponse = {
     sharedTracks: number;
     sharedArtistNames: string[];
     sharedTrackNames: string[];
+    explanation: {
+      version: 'jaccard-v2';
+      status: 'ready' | 'insufficient_data';
+      limitedData: boolean;
+      counts: { yourArtists: number; theirArtists: number; yourTracks: number; theirTracks: number };
+      signals: MatchSignal[];
+      sharedArtists: SharedMusicItem[];
+      sharedTracks: SharedMusicItem[];
+    };
   }[];
 };
 

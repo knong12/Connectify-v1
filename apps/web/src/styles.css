@@ -1098,6 +1098,111 @@ code {
 .messaging-page :is(a, button, textarea):focus-visible { outline: 2px solid var(--chat-accent); outline-offset: 3px; }
 .messaging-page button:disabled { opacity: 0.55; cursor: not-allowed; }
 
+.overlap-page {
+  min-width: 0;
+  width: 100%;
+  --overlap-muted: #52675b;
+  --overlap-line: #d5dfd8;
+  --overlap-soft: #edf3ef;
+  --overlap-artist: #15743a;
+  --overlap-track: #a34f12;
+  --overlap-warning: #805300;
+}
+
+:root[data-theme="dark"] .overlap-page {
+  --overlap-muted: #b5c6ba;
+  --overlap-line: #435148;
+  --overlap-soft: #303d34;
+  --overlap-artist: #78d49b;
+  --overlap-track: #efb67a;
+  --overlap-warning: #edcd82;
+}
+
+.overlap-page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: end;
+  gap: 1rem;
+}
+
+.overlap-page .eyebrow { letter-spacing: 0; }
+.overlap-page-header h2 { margin: 0.5rem 0 0; font-size: 1.75rem; }
+.overlap-result-count { white-space: nowrap; font-size: 0.9rem; color: var(--overlap-muted); }
+.overlap-page-intro { margin: 0 0 0.5rem; max-width: 72ch; line-height: 1.6; color: var(--overlap-muted); }
+.overlap-carousel { min-width: 0; }
+.overlap-carousel-controls { display: flex; justify-content: flex-end; gap: 0.5rem; margin-bottom: 0.75rem; }
+.overlap-scroll-button { display: inline-grid; place-items: center; width: 40px; height: 40px; padding: 0; border: 1px solid var(--overlap-line); border-radius: 6px; background: var(--overlap-soft); color: inherit; cursor: pointer; }
+.overlap-scroll-button:hover:not(:disabled) { border-color: var(--overlap-artist); }
+.overlap-scroll-button:disabled { opacity: 0.4; cursor: default; }
+.overlap-carousel-track { display: grid; grid-auto-flow: column; grid-auto-columns: min(440px, calc(100% - 1.25rem)); gap: 1.25rem; align-items: start; overflow-x: auto; overscroll-behavior-x: contain; scroll-snap-type: x proximity; scrollbar-width: thin; scrollbar-color: var(--overlap-muted) transparent; padding: 4px 4px 1rem; }
+.overlap-carousel-track > .overlap-card { scroll-snap-align: start; }
+.overlap-carousel-track { scroll-padding-inline: 4px; }
+.overlap-carousel-track:focus-visible { outline: 2px solid var(--overlap-artist); outline-offset: 2px; }
+.overlap-carousel-track .overlap-summary > p { overflow-wrap: anywhere; }
+.card.overlap-card { padding: 1.25rem; border: 1px solid var(--overlap-line); border-radius: 8px; box-shadow: none; min-width: 0; }
+.overlap-card-header { display: flex; gap: 0.75rem; justify-content: space-between; align-items: start; }
+.overlap-person { display: flex; gap: 0.75rem; align-items: center; min-width: 0; }
+.overlap-person > div { min-width: 0; }
+.overlap-person h3 { margin: 0 0 0.25rem; font-size: 1.1rem; overflow-wrap: anywhere; }
+.overlap-person .muted { font-size: 0.8rem; }
+.overlap-person:hover h3 { text-decoration: underline; }
+.overlap-avatar { width: 48px; height: 48px; flex: 0 0 48px; border-radius: 50%; object-fit: cover; }
+.overlap-avatar-fallback { display: grid; place-items: center; background: var(--overlap-soft); font-weight: 700; }
+.overlap-score { display: grid; text-align: right; flex: 0 0 100px; }
+.overlap-score strong { font-size: 2rem; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.overlap-score > span { margin-top: 0.3rem; font-size: 0.75rem; color: var(--overlap-muted); }
+.overlap-summary { padding: 1.25rem 0 1rem; }
+.overlap-summary h4 { margin: 0 0 0.45rem; font-size: 0.95rem; }
+.overlap-summary > p { margin: 0; color: var(--overlap-muted); font-size: 0.9rem; line-height: 1.6; }
+.overlap-counts { display: flex; flex-wrap: wrap; gap: 0.75rem; margin-top: 0.8rem; }
+.overlap-counts > span { display: inline-flex; gap: 0.35rem; align-items: center; font-size: 0.8rem; font-weight: 600; }
+.overlap-summary .overlap-sample-names { margin-top: 0.6rem; font-size: 0.8rem; overflow-wrap: anywhere; }
+.overlap-contributions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1.25rem; padding: 1rem 0; border-top: 1px solid var(--overlap-line); }
+.overlap-contribution { --bar-color: var(--overlap-artist); min-width: 0; }
+.overlap-contribution.is-track { --bar-color: var(--overlap-track); }
+.overlap-contribution > div { display: flex; justify-content: space-between; gap: 0.4rem; font-size: 0.85rem; }
+.overlap-contribution small { font-weight: 400; color: var(--overlap-muted); }
+.overlap-contribution meter { display: block; appearance: none; width: 100%; height: 6px; margin: 0.6rem 0 0.3rem; background: var(--overlap-soft); border: 0; border-radius: 3px; }
+.overlap-contribution meter::-webkit-meter-bar { border: 0; border-radius: 3px; background: var(--overlap-soft); height: 6px; }
+.overlap-contribution meter::-webkit-meter-optimum-value { background: var(--bar-color); }
+.overlap-contribution meter::-moz-meter-bar { background: var(--bar-color); }
+.overlap-maximum { font-size: 0.75rem; color: var(--overlap-muted); }
+.overlap-data-note { display: flex; align-items: start; gap: 0.5rem; color: var(--overlap-warning); font-size: 0.8rem; line-height: 1.5; margin: 0 0 1rem; }
+.overlap-data-note svg { flex-shrink: 0; margin-top: 2px; }
+.overlap-disclosure { border-top: 1px solid var(--overlap-line); }
+.overlap-disclosure summary { display: flex; align-items: center; gap: 0.5rem; padding: 1rem 0; font-size: 0.9rem; font-weight: 600; cursor: pointer; list-style: none; }
+.overlap-disclosure summary::-webkit-details-marker { display: none; }
+.overlap-disclosure summary > svg { margin-left: auto; flex-shrink: 0; }
+.overlap-disclosure[open] > summary > svg { transform: rotate(180deg); }
+.overlap-disclosure-count { font-weight: 400; color: var(--overlap-muted); }
+.overlap-window-row { display: grid; grid-template-columns: 0.8fr 1fr 1fr; gap: 0.5rem; padding: 0.7rem 0; border-top: 1px solid var(--overlap-line); font-size: 0.75rem; }
+.overlap-window-heading { border-top: 0; padding-top: 0; color: var(--overlap-muted); }
+.overlap-window-row > div { display: grid; align-content: start; gap: 0.3rem; min-width: 0; }
+.overlap-window-row > div > span { color: var(--overlap-muted); line-height: 1.5; }
+.overlap-method-note { font-size: 0.78rem; line-height: 1.6; color: var(--overlap-muted); }
+.overlap-kind-tabs { display: flex; gap: 0.5rem; margin-bottom: 0.5rem; }
+.overlap-kind-tabs button { display: inline-flex; align-items: center; gap: 0.4rem; background: transparent; color: inherit; border: 1px solid var(--overlap-line); padding: 0.5rem 0.6rem; border-radius: 6px; font: inherit; font-size: 0.8rem; cursor: pointer; }
+.overlap-kind-tabs button[aria-pressed="true"] { background: var(--overlap-soft); border-color: var(--overlap-artist); }
+.overlap-evidence-list { margin: 0; padding: 4px; list-style: none; max-height: 300px; overflow-y: auto; }
+.overlap-evidence-list > li { padding: 0.65rem 0; border-bottom: 1px solid var(--overlap-line); }
+.overlap-music-link { display: flex; gap: 0.6rem; align-items: center; font-size: 0.85rem; font-weight: 600; }
+.overlap-music-link > img, .overlap-art-fallback { width: 36px; height: 36px; flex: 0 0 36px; border-radius: 0; }
+.overlap-art-fallback { display: grid; place-items: center; background: var(--overlap-soft); }
+.overlap-music-link > span:not(.overlap-art-fallback) { min-width: 0; overflow-wrap: anywhere; }
+.overlap-music-link > svg { margin-left: auto; flex-shrink: 0; }
+.overlap-music-link:hover { text-decoration: underline; }
+.overlap-ranks { margin: 0.4rem 0 0 2.85rem; display: grid; gap: 0.25rem; font-size: 0.7rem; line-height: 1.5; color: var(--overlap-muted); }
+.overlap-empty, .overlap-spotify-credit { font-size: 0.8rem; color: var(--overlap-muted); padding-bottom: 0.6rem; }
+.overlap-spotify-credit a { text-decoration: underline; }
+.overlap-profile-note { border-top: 1px solid var(--overlap-line); margin: 0; padding-top: 0.8rem; font-size: 0.85rem; line-height: 1.6; color: var(--overlap-muted); overflow-wrap: anywhere; }
+.overlap-profile-note + .overlap-profile-note { border-top: 0; padding-top: 0.4rem; }
+.overlap-actions { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 0.75rem; padding-top: 1rem; border-top: 1px solid var(--overlap-line); margin-top: 0.75rem; }
+.overlap-actions .button { display: inline-flex; gap: 0.45rem; align-items: center; justify-content: center; margin-top: 0; border-radius: 6px; font-size: 0.85rem; padding: 0.65rem 0.8rem; }
+.overlap-actions .button:not(.button-ghost):not(.button-secondary) { background: #15743a; }
+.overlap-action-error { color: #b91c1c; font-size: 0.85rem; }
+:root[data-theme="dark"] .overlap-action-error { color: #fca5a5; }
+.overlap-page :is(a, button, summary):focus-visible { outline: 2px solid var(--overlap-artist); outline-offset: 3px; }
+
 @media (max-width: 720px) {
   .chat-workspace { grid-template-columns: minmax(0, 1fr); height: min(680px, calc(100dvh - 260px)); min-height: 430px; }
   .chat-workspace:not(.has-active-thread) .chat-thread { display: none; }
@@ -1109,6 +1214,11 @@ code {
   .chat-history { padding: 0.8rem; }
   .chat-bubble { max-width: 90%; }
   .chat-composer { padding: 0.65rem; }
+  .overlap-carousel-track { grid-auto-columns: calc(100% - 1.25rem); gap: 0.75rem; }
+  .overlap-page-header { align-items: start; flex-direction: column; gap: 0.5rem; }
+  .card.overlap-card { padding: 1rem; }
+  .overlap-score { flex-basis: 85px; }
+  .overlap-avatar { width: 40px; height: 40px; flex-basis: 40px; }
   .topbar {
     align-items: start;
     flex-direction: column;
