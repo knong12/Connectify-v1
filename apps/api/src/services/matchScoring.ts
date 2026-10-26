@@ -1,8 +1,13 @@
 export const timeRanges = ['short_term', 'medium_term', 'long_term'] as const;
 export type TimeRange = typeof timeRanges[number];
 export type MusicKind = 'artists' | 'tracks';
+
+//range weights and overlap points
 const rangeWeights = { short_term: 0.5, medium_term: 0.3, long_term: 0.2 };
-const kindWeights = { artists: 0.6, tracks: 0.4 };
+const overlapPoints = {
+  artists: { short_term: 16, medium_term: 12, long_term: 9 },
+  tracks: { short_term: 10, medium_term: 8, long_term: 6 }
+};
 
 export type MusicItem = {
   spotifyId: string;
@@ -49,12 +54,11 @@ export function compareMusicProfiles(yours: MusicProfile, theirs: MusicProfile) 
       const yourItems = yourIndex[range];
       const theirItems = theirIndex[range];
       const sharedCount = [...yourItems.keys()].filter((id) => theirItems.has(id)).length;
-      const unionCount = yourItems.size + theirItems.size - sharedCount;
+      const pointsPerItem = overlapPoints[kind][range];
       signals.push({
         kind, timeRange: range,
-        yourCount: yourItems.size, theirCount: theirItems.size, sharedCount, unionCount,
-        similarity: unionCount ? sharedCount / unionCount : 0,
-        baseWeight: kindWeights[kind] * rangeWeights[range]
+        yourCount: yourItems.size, theirCount: theirItems.size, sharedCount,
+        pointsPerItem, contribution: sharedCount * pointsPerItem
       });
     }
     const itemsById = new Map(yours[kind].map((item) => [item.spotifyId, item]));
@@ -73,26 +77,19 @@ export function compareMusicProfiles(yours: MusicProfile, theirs: MusicProfile) 
         a.windows.reduce((sum, window) => sum + rangeWeights[window.timeRange], 0) ||
       a.name.localeCompare(b.name) || a.spotifyId.localeCompare(b.spotifyId));
   }
-  // Only jointly empty signals are omitted. A one-sided list still counts as zero overlap.
-  const totalWeight = signals.filter((signal) => signal.unionCount > 0)
-    .reduce((sum, signal) => sum + signal.baseWeight, 0);
-  const breakdown = signals.map((signal) => ({
-    ...signal,
-    maxPoints: totalWeight && signal.unionCount ? signal.baseWeight / totalWeight * 100 : 0,
-    contribution: totalWeight && signal.unionCount ? signal.similarity * signal.baseWeight / totalWeight * 100 : 0
-  }));
   const hasYourData = counts.yourArtists + counts.yourTracks > 0;
   const hasTheirData = counts.theirArtists + counts.theirTracks > 0;
-  const rawScore = breakdown.reduce((sum, signal) => sum + signal.contribution, 0);
+  const rawScore = signals.reduce((sum, signal) => sum + signal.contribution, 0);
   const limitedData = Math.min(counts.yourArtists + counts.yourTracks, counts.theirArtists + counts.theirTracks) < 10 ||
-    breakdown.some((signal) => signal.yourCount === 0 || signal.theirCount === 0);
+    signals.some((signal) => signal.yourCount === 0 || signal.theirCount === 0);
   return {
-    score: Math.round(Math.min(100, Math.max(0, rawScore)) * 10) / 10,
+    // Preserve the original fixed-point score, including its floor for zero overlap.
+    score: Math.min(100, Math.max(8, rawScore)),
     rawScore,
     explanation: {
-      version: 'jaccard-v2' as const,
+      version: 'fixed-overlap-v1' as const,
       status: hasYourData && hasTheirData ? 'ready' as const : 'insufficient_data' as const,
-      limitedData, counts, signals: breakdown,
+      limitedData, counts, signals,
       sharedArtists: evidence.artists, sharedTracks: evidence.tracks
     }
   };

@@ -78,7 +78,7 @@ export default function MessagesPage() {
   }, [conversationId, token, version]);
 
   const acknowledgeRead = useCallback(() => {
-    const newest = view.messages.at(-1)?.id;
+    const newest = view.messages[view.messages.length - 1]?.id;
     if (!token || !conversationId || !newest || !nearBottom.current || document.visibilityState !== 'visible' || lastRead.current === newest) return;
     lastRead.current = newest;
     void markRead(token, conversationId, newest).then(() => refresh(conversationId)).catch(() => {

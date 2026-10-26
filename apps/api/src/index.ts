@@ -12,6 +12,8 @@ import meRoutes from './routes/me.js';
 import usersRoutes from './routes/users.js';
 import mixRoutes from './routes/mixes.js';
 
+
+//create backend server and messaging server
 const app = express();
 const server = createServer(app);
 const messaging = createMessagingServer(server);

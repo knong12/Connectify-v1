@@ -68,10 +68,7 @@ export type MatchSignal = {
   yourCount: number;
   theirCount: number;
   sharedCount: number;
-  unionCount: number;
-  similarity: number;
-  baseWeight: number;
-  maxPoints: number;
+  pointsPerItem: number;
   contribution: number;
 };
 
@@ -90,7 +87,7 @@ export type MatchesResponse = {
     sharedArtistNames: string[];
     sharedTrackNames: string[];
     explanation: {
-      version: 'jaccard-v2';
+      version: 'fixed-overlap-v1';
       status: 'ready' | 'insufficient_data';
       limitedData: boolean;
       counts: { yourArtists: number; theirArtists: number; yourTracks: number; theirTracks: number };

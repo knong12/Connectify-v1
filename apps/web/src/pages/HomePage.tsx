@@ -3,6 +3,8 @@ import { useSearchParams } from 'react-router-dom';
 
 const apiUrl = getApiUrl();
 
+
+//various auth messages based on the state
 const authMessages: Record<string, string> = {
   invalid_state: 'Your login attempt expired or could not be verified. Please start Spotify login again.',
   cancelled: 'Spotify login was cancelled. You can try again when you are ready.',
@@ -26,7 +28,7 @@ export default function HomePage() {
       <section className="hero home-hero">
         <div className="home-hero-copy">
           <p className="eyebrow">Connect Through Music</p>
-          <h2>Find people who actually listen like you.</h2>
+          <h2>Find people who have similar music taste</h2>
           <p className="home-lead">
             Connectify uses your Spotify taste to build a music profile, surface potential matches,
             and help you discover people with a similar vibe.
@@ -37,9 +39,9 @@ export default function HomePage() {
         </div>
         <div className="home-hero-card">
           <p className="eyebrow">What You Get</p>
-          <h3>Your music identity in one place</h3>
+          <h3>Your music identity</h3>
           <p className="muted">
-            Sync your top artists and tracks, compare taste across different time ranges, and
+            Sync your top artists and tracks, compare taste, and
             explore profiles that feel close to your listening style.
           </p>
           <div className="pill-row">

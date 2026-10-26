@@ -1,3 +1,5 @@
+//defines TypeScript types for authentication
+
 export type SpotifyTokenResponse = {
   access_token: string;
   token_type: string;
