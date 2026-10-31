@@ -9,13 +9,17 @@ type MessagingState = {
   error: string; connected: boolean; expired: boolean; version: number;
   nextCursor: string | null;
   initialized: boolean;
+  requests: Conversation[];
+  requestTotal: number;
+  requestCursor: string | null;
 };
 const initial: MessagingState = { userId: null, conversations: [], unreadTotal: 0, loading: true, loadingMore: false,
-  error: '', connected: false, expired: false, version: 0, nextCursor: null, initialized: false };
+  error: '', connected: false, expired: false, version: 0, nextCursor: null, initialized: false,
+  requests: [], requestTotal: 0, requestCursor: null };
 type MessagingContext = MessagingState & {
   token: string | null;
   refresh: (conversationId?: string) => Promise<void>;
-  loadMore: () => Promise<void>;
+  loadMore: (folder?: 'inbox' | 'requests') => Promise<void>;
   openConversation: (userId: string) => Promise<Conversation>;
   subscribe: (listener: (message: ChatMessage) => void) => () => void;
 };
@@ -31,6 +35,9 @@ const mergeConversations = (previous: Conversation[], incoming: Conversation[]) 
   for (const conversation of incoming) indexed.set(conversation.id, conversation);
   return [...indexed.values()].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt) || a.id.localeCompare(b.id));
 };
+const isRequest = (conversation: Conversation) => conversation.status === 'pending' && conversation.requestDirection === 'incoming';
+const isInbox = (conversation: Conversation) => !isRequest(conversation) &&
+  !(conversation.status === 'declined' && conversation.requestDirection === 'incoming');
 
 export function MessagingProvider({ token, children }: { token: string | null; children: ReactNode }) {
   const [state, setState] = useState(initial);
@@ -46,11 +53,15 @@ export function MessagingProvider({ token, children }: { token: string | null; c
     if (!token) return;
     const sequence = ++requestNumber.current;
     try {
-      const [inbox, detail] = await Promise.all([getInbox(token), conversationId ? getConversation(token, conversationId) : null]);
+      const [inbox, requests, detail] = await Promise.all([
+        getInbox(token), getInbox(token, undefined, 'requests'), conversationId ? getConversation(token, conversationId) : null
+      ]);
       if (activeToken.current !== token || sequence !== requestNumber.current) return;
-      setState((previous) => ({ ...previous, userId: inbox.userId, unreadTotal: inbox.unreadTotal, loading: false, error: '', initialized: true,
-        nextCursor: previous.initialized ? previous.nextCursor : inbox.nextCursor,
-        conversations: mergeConversations(previous.conversations, [...inbox.conversations, ...(detail ? [detail.conversation] : [])]) }));
+      setState((previous) => ({ ...previous, userId: inbox.userId, unreadTotal: inbox.unreadTotal, requestTotal: inbox.requestTotal, loading: false, error: '', initialized: true,
+        nextCursor: previous.nextCursor ?? inbox.nextCursor,
+        requestCursor: previous.requestCursor ?? requests.nextCursor,
+        conversations: mergeConversations([...previous.conversations, ...previous.requests], [...inbox.conversations, ...requests.conversations, ...(detail ? [detail.conversation] : [])]).filter(isInbox),
+        requests: mergeConversations([...previous.requests, ...previous.conversations], [...inbox.conversations, ...requests.conversations, ...(detail ? [detail.conversation] : [])]).filter(isRequest) }));
     } catch (error) {
       if (activeToken.current === token && sequence === requestNumber.current) {
         setState((previous) => ({ ...previous, loading: false, error: error instanceof Error ? error.message : 'Could not load messages.' }));
@@ -83,27 +94,34 @@ export function MessagingProvider({ token, children }: { token: string | null; c
     return () => { socket.disconnect(); window.removeEventListener('focus', focus); };
   }, [token, refresh]);
 
-  async function loadMore() {
-    if (!token || !state.nextCursor || state.loadingMore) return;
+  async function loadMore(folder: 'inbox' | 'requests' = 'inbox') {
+    const cursor = folder === 'requests' ? state.requestCursor : state.nextCursor;
+    if (!token || !cursor || state.loadingMore) return;
     setState((previous) => ({ ...previous, loadingMore: true }));
     try {
-      const inbox = await getInbox(token, state.nextCursor);
+      const inbox = await getInbox(token, cursor, folder);
       if (activeToken.current !== token) return;
-      setState((previous) => ({ ...previous, loadingMore: false, nextCursor: inbox.nextCursor,
-        conversations: mergeConversations(previous.conversations, inbox.conversations.filter((incoming) => !previous.conversations.some((existing) => existing.id === incoming.id))) }));
+      setState((previous) => {
+        const key = folder === 'requests' ? 'requests' : 'conversations';
+        return { ...previous, loadingMore: false, [folder === 'requests' ? 'requestCursor' : 'nextCursor']: inbox.nextCursor,
+          [key]: mergeConversations(previous[key], inbox.conversations.filter((incoming) => !previous[key].some((existing) => existing.id === incoming.id))) };
+      });
     } catch { if (activeToken.current === token) setState((previous) => ({ ...previous, loadingMore: false, error: 'Could not load older conversations.' })); }
   }
   async function openConversation(userId: string) {
     if (!token) throw new Error('Please sign in to message someone.');
     const { conversation } = await createConversation(token, userId);
     if (activeToken.current !== token) throw new Error('Your session changed. Please try again.');
-    setState((previous) => ({ ...previous, conversations: mergeConversations(previous.conversations, [conversation]) }));
+    setState((previous) => ({ ...previous,
+      conversations: mergeConversations(previous.conversations, [conversation]).filter(isInbox),
+      requests: mergeConversations(previous.requests, [conversation]).filter(isRequest) }));
     return conversation;
   }
   return <Context.Provider value={{ ...state, token, refresh, loadMore, openConversation, subscribe }}>{children}</Context.Provider>;
 }
 
 export function MessagesNavLink() {
-  const { unreadTotal } = useMessaging();
-  return <NavLink to="/messages">Messages{unreadTotal > 0 && <span className="message-nav-count" aria-label={`${unreadTotal} unread messages`}>{unreadTotal > 99 ? '99+' : unreadTotal}</span>}</NavLink>;
+  const { unreadTotal, requestTotal } = useMessaging();
+  const total = unreadTotal + requestTotal;
+  return <NavLink to="/messages">Messages{total > 0 && <span className="message-nav-count" aria-label={`${unreadTotal} unread messages and ${requestTotal} requests`}>{total > 99 ? '99+' : total}</span>}</NavLink>;
 }

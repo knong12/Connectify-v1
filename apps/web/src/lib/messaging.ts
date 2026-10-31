@@ -8,8 +8,10 @@ export type ChatMessage = {
 export type Conversation = {
   id: string; otherUser: ChatPerson; updatedAt: string; lastMessage: ChatMessage | null;
   unreadCount: number; canSend: boolean;
+  status: 'mutual' | 'pending' | 'accepted' | 'declined';
+  requestDirection: 'incoming' | 'outgoing' | null;
 };
-export type InboxResponse = { userId: string; conversations: Conversation[]; unreadTotal: number; nextCursor: string | null };
+export type InboxResponse = { userId: string; conversations: Conversation[]; unreadTotal: number; requestTotal: number; nextCursor: string | null };
 export class ChatRequestError extends Error {
   constructor(public code: string, public status: number, message: string) { super(message); }
 }
@@ -29,7 +31,8 @@ async function request<T>(token: string, path: string, body?: unknown) {
   return data as T;
 }
 
-export const getInbox = (token: string, before?: string) => request<InboxResponse>(token, before ? `?before=${encodeURIComponent(before)}` : '');
+export const getInbox = (token: string, before?: string, folder: 'inbox' | 'requests' = 'inbox') =>
+  request<InboxResponse>(token, `?folder=${folder}${before ? `&before=${encodeURIComponent(before)}` : ''}`);
 export const getConversation = (token: string, id: string) => request<{ conversation: Conversation }>(token, `/${encodeURIComponent(id)}`);
 export const createConversation = (token: string, targetUserId: string) => request<{ conversation: Conversation }>(token, '', { targetUserId });
 export const getMessages = (token: string, id: string, before?: number) => request<{ messages: ChatMessage[]; nextCursor: number | null }>(token,
@@ -38,3 +41,5 @@ export const postMessage = (token: string, id: string, body: string, clientMessa
   `/${encodeURIComponent(id)}/messages`, { body, clientMessageId });
 export const markRead = (token: string, id: string, throughMessageId: number) => request<{ success: boolean }>(token,
   `/${encodeURIComponent(id)}/read`, { throughMessageId });
+export const respondToRequest = (token: string, id: string, decision: 'accepted' | 'declined') =>
+  request<{ conversation: Conversation }>(token, `/${encodeURIComponent(id)}/request`, { decision });

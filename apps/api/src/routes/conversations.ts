@@ -1,7 +1,7 @@
 import { Router, type Request, type Response, type NextFunction } from 'express';
 import { z } from 'zod';
 import { requireAuth } from '../middleware/auth.js';
-import { listConversations, listMessages, startConversation, sendMessage, markConversationRead, conversationPreview, MessagingError } from '../services/messageService.js';
+import { listConversations, listMessages, startConversation, sendMessage, markConversationRead, conversationPreview, respondToRequest, MessagingError } from '../services/messageService.js';
 
 type Notify = (userIds: string[], event: 'message:new' | 'inbox:changed', payload?: unknown) => void;
 const idSchema = z.string().uuid();
@@ -25,7 +25,8 @@ export function createConversationRoutes(notify: Notify) {
   }
   router.get('/', async (req, res) => {
     const before = req.query.before === undefined ? undefined : idSchema.parse(req.query.before);
-    res.set('Cache-Control', 'no-store').json(await listConversations(userId(req), before));
+    const folder = z.enum(['inbox', 'requests']).default('inbox').parse(req.query.folder);
+    res.set('Cache-Control', 'no-store').json(await listConversations(userId(req), before, folder));
   });
   router.post('/', async (req, res) => {
     const { targetUserId } = z.object({ targetUserId: idSchema }).strict().parse(req.body);
@@ -54,6 +55,13 @@ export function createConversationRoutes(notify: Notify) {
     await markConversationRead(userId(req), idSchema.parse(req.params.id), throughMessageId);
     notify([userId(req)], 'inbox:changed', { conversationId: req.params.id });
     res.json({ success: true });
+  });
+  router.post('/:id/request', async (req, res) => {
+    throttle(userId(req));
+    const { decision } = z.object({ decision: z.enum(['accepted', 'declined']) }).strict().parse(req.body);
+    const result = await respondToRequest(userId(req), idSchema.parse(req.params.id), decision);
+    notify(result.members, 'inbox:changed', { conversationId: result.conversation.id });
+    res.json({ conversation: result.conversation });
   });
   router.use((error: unknown, _req: Request, res: Response, _next: NextFunction) => {
     if (error instanceof z.ZodError) { res.status(400).json({ code: 'invalid_input', message: 'Check your message and try again. Messages must contain 1-2000 characters.' }); return; }

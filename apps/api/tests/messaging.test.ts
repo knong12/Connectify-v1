@@ -46,12 +46,15 @@ test('messaging REST, persistence, private delivery, and access controls', {
       { followerId: ids[0], followingId: ids[1] }, { followerId: ids[1], followingId: ids[0] }
     ] });
 
-    await t.test('unauthenticated REST, missing socket tokens, expired tokens, and non-mutual starts are rejected', async () => {
+    await t.test('authentication is enforced and non-mutual starts become requests', async () => {
       assert.equal((await request(null)).status, 401);
       await assert.rejects(connect(''));
       await assert.rejects(connect(jwt.sign({ userId: ids[0] }, env.JWT_SECRET, { expiresIn: -1 })));
       assert.equal((await request(0, '', { targetUserId: ids[0] })).status, 400);
-      assert.equal((await request(0, '', { targetUserId: ids[2] })).status, 403);
+      const requested = await request(0, '', { targetUserId: ids[2] });
+      assert.equal(requested.status, 201);
+      assert.equal(requested.data.conversation.status, 'pending');
+      assert.equal(requested.data.conversation.requestDirection, 'outgoing');
     });
     const [started, concurrent] = await Promise.all([
       request(0, '', { targetUserId: ids[1] }), request(1, '', { targetUserId: ids[0] })

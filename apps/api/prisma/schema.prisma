@@ -101,10 +101,19 @@ model UserFavoriteTrack {
   @@unique([userId, rank, timeRange])
 }
 
+enum ConversationStatus {
+  mutual
+  pending
+  accepted
+  declined
+}
+
 model Conversation {
   id          String   @id @default(uuid())
   memberAId   String
   memberBId   String
+  status      ConversationStatus @default(mutual)
+  requesterId String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   memberA     User     @relation("ConversationMemberA", fields: [memberAId], references: [id], onDelete: Cascade)

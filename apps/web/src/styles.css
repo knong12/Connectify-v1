@@ -1046,6 +1046,15 @@ code {
 .chat-inbox { min-width: 0; min-height: 0; overflow-y: auto; border-right: 1px solid var(--chat-line); }
 .chat-inbox-heading { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; padding: 1rem; border-bottom: 1px solid var(--chat-line); }
 .chat-inbox-heading h3 { margin: 0; font-size: 0.95rem; }
+.chat-folder-tabs { display: grid; grid-template-columns: 1fr 1fr; border-bottom: 1px solid var(--chat-line); }
+.chat-folder-tabs button { min-height: 44px; margin: 0; padding: 0.6rem 0.4rem; border: 0; border-bottom: 2px solid transparent; border-radius: 0; background: transparent; color: var(--chat-muted); font: inherit; font-size: 0.8rem; cursor: pointer; overflow-wrap: anywhere; }
+.chat-folder-tabs button[aria-pressed="true"] { border-bottom-color: var(--chat-accent); color: var(--chat-text); background: var(--chat-soft); }
+.chat-request-label { flex-shrink: 0; font-size: 0.7rem; color: var(--chat-muted); }
+.chat-request-actions { flex-shrink: 0; padding: 0.8rem 1rem; border-top: 1px solid var(--chat-line); background: var(--chat-soft); }
+.chat-request-actions p { margin: 0 0 0.7rem; font-size: 0.85rem; overflow-wrap: anywhere; }
+.chat-request-actions > div { display: flex; flex-wrap: wrap; gap: 0.6rem; }
+.chat-request-actions button { display: inline-flex; align-items: center; justify-content: center; gap: 0.4rem; min-height: 40px; margin: 0; padding: 0.5rem 0.8rem; border-radius: 6px; font: inherit; font-size: 0.85rem; }
+.chat-decline-button { border: 1px solid var(--chat-line); background: var(--chat-surface); color: var(--chat-text); cursor: pointer; }
 .chat-icon-button { display: inline-flex; align-items: center; justify-content: center; width: 34px; height: 34px; flex: 0 0 34px; border: 0; border-radius: 6px; background: transparent; color: inherit; cursor: pointer; }
 .chat-icon-button:hover { background: var(--chat-soft); }
 .chat-inbox-note { padding: 0 1rem; font-size: 0.85rem; line-height: 1.5; }

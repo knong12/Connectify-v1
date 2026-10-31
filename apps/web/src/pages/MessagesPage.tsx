@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { ArrowLeft, ArrowDown, ArrowUpRight, MessageCircle, RefreshCw, Send } from 'lucide-react';
+import { ArrowLeft, ArrowDown, ArrowUpRight, Check, X, MessageCircle, RefreshCw, Send } from 'lucide-react';
 import { useMessaging } from '../components/MessagingProvider';
-import { ChatRequestError, getConversation, getMessages, markRead, postMessage, type ChatMessage, type ChatPerson, type Conversation } from '../lib/messaging';
+import { ChatRequestError, getConversation, getMessages, markRead, postMessage, respondToRequest, type ChatMessage, type ChatPerson, type Conversation } from '../lib/messaging';
 
 type Outgoing = { clientMessageId: string; body: string; conversationId: string; status: 'sending' | 'failed' };
 type Thread = { id: string; conversation: Conversation | null; messages: ChatMessage[]; nextCursor: number | null;
@@ -23,8 +23,10 @@ function PersonAvatar({ person }: { person: ChatPerson }) {
 
 export default function MessagesPage() {
   const { conversationId } = useParams();
-  const { token, userId, conversations, connected, expired, version, subscribe, refresh,
+  const { token, userId, conversations, requests, requestTotal, requestCursor, connected, expired, version, subscribe, refresh,
     loading, loadingMore, nextCursor, loadMore, error: inboxError } = useMessaging();
+  const [folder, setFolder] = useState<'inbox' | 'requests'>('inbox');
+  const [deciding, setDeciding] = useState(false);
   const [thread, setThread] = useState<Thread>(emptyThread);
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [outbox, setOutbox] = useState<Outgoing[]>([]);
@@ -41,10 +43,21 @@ export default function MessagesPage() {
   activeUser.current = userId;
   const lastRead = useRef(0);
   const view = thread.id === conversationId ? thread : emptyThread;
-  const knownConversation = conversations.find((entry) => entry.id === conversationId) ?? view.conversation;
+  const cachedConversation = [...conversations, ...requests].find((entry) => entry.id === conversationId);
+  const knownConversation = view.conversation && (!cachedConversation || view.conversation.updatedAt > cachedConversation.updatedAt)
+    ? view.conversation : cachedConversation ?? view.conversation;
   const draft = drafts[conversationId ?? ''] ?? '';
   const pending = outbox.filter((message) => message.conversationId === conversationId);
   const canSend = !!knownConversation?.canSend && !!userId && !expired;
+  const incomingRequest = knownConversation?.status === 'pending' && knownConversation.requestDirection === 'incoming';
+  const outgoingRequest = knownConversation?.status === 'pending' && knownConversation.requestDirection === 'outgoing';
+  const canCompose = canSend && !(outgoingRequest && (view.messages.length > 0 || pending.length > 0));
+  const visibleConversations = folder === 'requests' ? requests : conversations;
+  const folderCursor = folder === 'requests' ? requestCursor : nextCursor;
+
+  useEffect(() => {
+    if (incomingRequest) setFolder('requests');
+  }, [conversationId, incomingRequest]);
 
   useEffect(() => subscribe((message) => {
     if (message.conversationId !== activeId.current) return;
@@ -131,16 +144,34 @@ export default function MessagesPage() {
       if (activeToken.current !== token) return;
       setOutbox((previous) => previous.map((entry) => entry.clientMessageId === outgoing.clientMessageId ? { ...entry, status: 'failed' } : entry));
       if (activeId.current === outgoing.conversationId) setSendError(error instanceof Error ? error.message : 'Message not sent. Please retry.');
-      if (error instanceof ChatRequestError && error.code === 'mutual_follow_required') void refresh(outgoing.conversationId);
+      if (error instanceof ChatRequestError && ['mutual_follow_required', 'request_pending', 'request_declined'].includes(error.code)) void refresh(outgoing.conversationId);
     }
   }
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!conversationId || !canSend || !draft.trim() || draft.trim().length > 2000) return;
+    if (!conversationId || !canCompose || !draft.trim() || draft.trim().length > 2000) return;
     const outgoing: Outgoing = { conversationId, body: draft.trim(), clientMessageId: crypto.randomUUID(), status: 'sending' };
     setDrafts((previous) => ({ ...previous, [conversationId]: '' }));
     nearBottom.current = true; setHasNewMessages(false);
     void send(outgoing);
+  }
+
+  async function decide(decision: 'accepted' | 'declined') {
+    if (!token || !conversationId || deciding) return;
+    const id = conversationId;
+    setDeciding(true); setSendError('');
+    try {
+      const result = await respondToRequest(token, id, decision);
+      if (activeToken.current !== token || activeId.current !== id) return;
+      setThread((previous) => previous.id === id ? { ...previous, conversation: result.conversation } : previous);
+      await refresh(id);
+      setFolder(decision === 'accepted' ? 'inbox' : 'requests');
+    } catch (error) {
+      if (activeToken.current === token && activeId.current === id) {
+        setSendError(error instanceof Error ? error.message : 'Could not update this request.');
+        void refresh(id);
+      }
+    } finally { setDeciding(false); }
   }
 
   if (!token) return <section><h2>Messages</h2><p><Link to="/">Sign in with Spotify</Link> to see your conversations.</p></section>;
@@ -152,22 +183,28 @@ export default function MessagesPage() {
     <div className={`chat-workspace ${conversationId ? 'has-active-thread' : ''}`}>
       <aside className="chat-inbox" aria-label="Conversations">
         <div className="chat-inbox-heading"><h3>Conversations</h3><button type="button" className="chat-icon-button" title="Refresh conversations" aria-label="Refresh conversations" onClick={() => void refresh()}><RefreshCw size={16} /></button></div>
+        <div className="chat-folder-tabs" role="group" aria-label="Message folders">
+          <button type="button" aria-pressed={folder === 'inbox'} onClick={() => setFolder('inbox')}>Inbox</button>
+          <button type="button" aria-pressed={folder === 'requests'} onClick={() => setFolder('requests')}>Requests{requestTotal > 0 ? ` (${requestTotal})` : ''}</button>
+        </div>
         {loading && <p role="status" className="chat-inbox-note">Loading conversations...</p>}
         {inboxError && <p role="alert" className="chat-inbox-note">{inboxError}</p>}
-        {!loading && !conversations.length && <div className="chat-inbox-empty"><MessageCircle size={24} aria-hidden="true" /><p>No conversations yet.</p><p className="muted">Visit a mutual follower's profile to start one.</p><Link to="/profile">View my profile</Link></div>}
+        {!loading && !visibleConversations.length && <div className="chat-inbox-empty"><MessageCircle size={24} aria-hidden="true" /><p>{folder === 'requests' ? 'No message requests.' : 'No conversations yet.'}</p>{folder === 'inbox' && <Link to="/matches">Find a connection</Link>}</div>}
         <nav className="chat-conversation-list" aria-label="Choose a conversation">
-          {conversations.map((conversation) => <Link key={conversation.id} to={`/messages/${conversation.id}`} className={`chat-conversation ${conversation.id === conversationId ? 'is-active' : ''}`} aria-current={conversation.id === conversationId ? 'page' : undefined}>
+          {visibleConversations.map((conversation) => <Link key={conversation.id} to={`/messages/${conversation.id}`} className={`chat-conversation ${conversation.id === conversationId ? 'is-active' : ''}`} aria-current={conversation.id === conversationId ? 'page' : undefined}>
             <PersonAvatar person={conversation.otherUser} />
             <span className="chat-conversation-copy"><strong>{conversation.otherUser.displayName}</strong><span>{conversation.lastMessage ? `${conversation.lastMessage.senderId === userId ? 'You: ' : ''}${conversation.lastMessage.body}` : 'Start a conversation'}</span></span>
+            {conversation.status === 'pending' && <span className="chat-request-label">{conversation.requestDirection === 'outgoing' ? 'Pending' : 'New'}</span>}
+            {conversation.status === 'declined' && <span className="chat-request-label">Declined</span>}
             {conversation.unreadCount > 0 && <span className="chat-unread-count" aria-label={`${conversation.unreadCount} unread`}>{conversation.unreadCount > 99 ? '99+' : conversation.unreadCount}</span>}
           </Link>)}
         </nav>
-        {nextCursor && <button className="chat-load-more" type="button" disabled={loadingMore} onClick={() => void loadMore()}>{loadingMore ? 'Loading...' : 'More conversations'}</button>}
+        {folderCursor && <button className="chat-load-more" type="button" disabled={loadingMore} onClick={() => void loadMore(folder)}>{loadingMore ? 'Loading...' : 'More conversations'}</button>}
       </aside>
       <section className="chat-thread" aria-label="Message thread">
-        {!conversationId ? <div className="chat-thread-empty"><MessageCircle size={36} aria-hidden="true" /><h3>A conversation starts here</h3><p>Choose a conversation, or message someone you follow who follows you back.</p></div> : <>
+        {!conversationId ? <div className="chat-thread-empty"><MessageCircle size={36} aria-hidden="true" /><h3>A conversation starts here</h3><p>Choose a conversation or review a message request.</p></div> : <>
           <header className="chat-thread-header"><Link to="/messages" className="chat-icon-button chat-mobile-back" aria-label="Back to conversations" title="Back to conversations"><ArrowLeft size={18} /></Link>
-            {knownConversation && <><PersonAvatar person={knownConversation.otherUser} /><div><h3>{knownConversation.otherUser.displayName}</h3><span className="muted">{knownConversation.canSend ? 'Mutual followers' : 'Messaging paused'}</span></div>
+            {knownConversation && <><PersonAvatar person={knownConversation.otherUser} /><div><h3>{knownConversation.otherUser.displayName}</h3><span className="muted">{knownConversation.status === 'accepted' ? 'Request accepted' : knownConversation.status === 'pending' ? 'Message request' : knownConversation.status === 'declined' ? 'Request declined' : knownConversation.canSend ? 'Mutual followers' : 'Messaging paused'}</span></div>
               <Link to={`/profile/${knownConversation.otherUser.id}`} className="chat-icon-button" title="View profile" aria-label={`View ${knownConversation.otherUser.displayName}'s profile`}><ArrowUpRight size={18} /></Link></>}
           </header>
           <div className="chat-history" ref={scroller} onScroll={() => {
@@ -192,14 +229,21 @@ export default function MessagesPage() {
             </ol>
           </div>
           {hasNewMessages && <button className="chat-new-messages" type="button" onClick={() => { nearBottom.current = true; if (scroller.current) scroller.current.scrollTop = scroller.current.scrollHeight; setHasNewMessages(false); acknowledgeRead(); }}><ArrowDown size={14} />New messages</button>}
-          {knownConversation && !knownConversation.canSend && <p className="chat-paused" role="status">You must follow each other to send new messages. Your history is still available.</p>}
+          {incomingRequest && <div className="chat-request-actions">
+            <p>{knownConversation.otherUser.displayName} wants to message you.</p>
+            <div><button className="button" type="button" disabled={deciding || expired} onClick={() => void decide('accepted')}><Check size={16} aria-hidden="true" />Accept</button>
+              <button className="chat-decline-button" type="button" disabled={deciding || expired} onClick={() => void decide('declined')}><X size={16} aria-hidden="true" />Decline</button></div>
+          </div>}
+          {outgoingRequest && <p className="chat-paused" role="status">{canCompose ? 'Send one introduction with your request.' : 'Request pending. You can send more messages once it is accepted.'}</p>}
+          {knownConversation?.status === 'declined' && <p className="chat-paused" role="status">This request was declined. New messages are disabled.</p>}
+          {knownConversation?.status === 'mutual' && !knownConversation.canSend && <p className="chat-paused" role="status">You must follow each other to send new messages. Your history is still available.</p>}
           {sendError && <p role="alert" className="chat-send-error">{sendError}</p>}
-          {knownConversation && <form className="chat-composer" onSubmit={submit}>
+          {knownConversation && !incomingRequest && knownConversation.status !== 'declined' && <form className="chat-composer" onSubmit={submit}>
             <label htmlFor="chat-message" className="chat-sender-label">Message {knownConversation.otherUser.displayName}</label>
-            <textarea id="chat-message" rows={2} maxLength={2000} value={draft} disabled={!canSend} placeholder={canSend ? 'Write a message...' : 'Messaging is paused'}
+            <textarea id="chat-message" rows={2} maxLength={2000} value={draft} disabled={!canCompose} placeholder={canCompose ? 'Write a message...' : outgoingRequest ? 'Waiting for acceptance' : 'Messaging is paused'}
               onChange={(event) => setDrafts((previous) => ({ ...previous, [conversationId]: event.target.value }))}
               onKeyDown={(event) => { if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) { event.preventDefault(); event.currentTarget.form?.requestSubmit(); } }} />
-            <div><span className="muted">{draft.length}/2000</span><button className="button" type="submit" disabled={!canSend || !draft.trim()}><Send size={16} aria-hidden="true" />Send</button></div>
+            <div><span className="muted">{draft.length}/2000</span><button className="button" type="submit" disabled={!canCompose || !draft.trim()}><Send size={16} aria-hidden="true" />{outgoingRequest ? 'Send request' : 'Send'}</button></div>
           </form>}
         </>}
       </section>
