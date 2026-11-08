@@ -50,7 +50,8 @@ export default function MessagesPage() {
   const pending = outbox.filter((message) => message.conversationId === conversationId);
   const canSend = !!knownConversation?.canSend && !!userId && !expired;
   const incomingRequest = knownConversation?.status === 'pending' && knownConversation.requestDirection === 'incoming';
-  const outgoingRequest = knownConversation?.status === 'pending' && knownConversation.requestDirection === 'outgoing';
+  const outgoingRequest = !!knownConversation?.requiresRequest ||
+    (knownConversation?.status === 'pending' && knownConversation.requestDirection === 'outgoing');
   const canCompose = canSend && !(outgoingRequest && (view.messages.length > 0 || pending.length > 0));
   const visibleConversations = folder === 'requests' ? requests : conversations;
   const folderCursor = folder === 'requests' ? requestCursor : nextCursor;
@@ -204,7 +205,7 @@ export default function MessagesPage() {
       <section className="chat-thread" aria-label="Message thread">
         {!conversationId ? <div className="chat-thread-empty"><MessageCircle size={36} aria-hidden="true" /><h3>A conversation starts here</h3><p>Choose a conversation or review a message request.</p></div> : <>
           <header className="chat-thread-header"><Link to="/messages" className="chat-icon-button chat-mobile-back" aria-label="Back to conversations" title="Back to conversations"><ArrowLeft size={18} /></Link>
-            {knownConversation && <><PersonAvatar person={knownConversation.otherUser} /><div><h3>{knownConversation.otherUser.displayName}</h3><span className="muted">{knownConversation.status === 'accepted' ? 'Request accepted' : knownConversation.status === 'pending' ? 'Message request' : knownConversation.status === 'declined' ? 'Request declined' : knownConversation.canSend ? 'Mutual followers' : 'Messaging paused'}</span></div>
+            {knownConversation && <><PersonAvatar person={knownConversation.otherUser} /><div><h3>{knownConversation.otherUser.displayName}</h3><span className="muted">{knownConversation.status === 'accepted' ? (knownConversation.requestDirection ? 'Request accepted' : 'Conversation open') : knownConversation.status === 'pending' || knownConversation.requiresRequest ? 'Message request' : knownConversation.status === 'declined' ? 'Request declined' : 'Mutual followers'}</span></div>
               <Link to={`/profile/${knownConversation.otherUser.id}`} className="chat-icon-button" title="View profile" aria-label={`View ${knownConversation.otherUser.displayName}'s profile`}><ArrowUpRight size={18} /></Link></>}
           </header>
           <div className="chat-history" ref={scroller} onScroll={() => {
@@ -236,7 +237,6 @@ export default function MessagesPage() {
           </div>}
           {outgoingRequest && <p className="chat-paused" role="status">{canCompose ? 'Send one introduction with your request.' : 'Request pending. You can send more messages once it is accepted.'}</p>}
           {knownConversation?.status === 'declined' && <p className="chat-paused" role="status">This request was declined. New messages are disabled.</p>}
-          {knownConversation?.status === 'mutual' && !knownConversation.canSend && <p className="chat-paused" role="status">You must follow each other to send new messages. Your history is still available.</p>}
           {sendError && <p role="alert" className="chat-send-error">{sendError}</p>}
           {knownConversation && !incomingRequest && knownConversation.status !== 'declined' && <form className="chat-composer" onSubmit={submit}>
             <label htmlFor="chat-message" className="chat-sender-label">Message {knownConversation.otherUser.displayName}</label>

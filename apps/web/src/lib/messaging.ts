@@ -8,6 +8,7 @@ export type ChatMessage = {
 export type Conversation = {
   id: string; otherUser: ChatPerson; updatedAt: string; lastMessage: ChatMessage | null;
   unreadCount: number; canSend: boolean;
+  requiresRequest: boolean;
   status: 'mutual' | 'pending' | 'accepted' | 'declined';
   requestDirection: 'incoming' | 'outgoing' | null;
 };

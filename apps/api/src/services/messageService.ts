@@ -37,13 +37,15 @@ export async function conversationPreview(userId: string, id: string) {
   });
   if (!conversation) throw new MessagingError(404, 'not_found', 'Conversation not found.');
   const otherUser = conversation.memberAId === userId ? conversation.memberB : conversation.memberA;
+  const mutual = conversation.status === 'mutual' && await areMutualFollowers(userId, otherUser.id);
+  const requiresRequest = conversation.status === 'mutual' && !mutual && conversation.messages.length === 0;
   return {
     id: conversation.id, otherUser, updatedAt: conversation.updatedAt,
     status: conversation.status,
     requestDirection: conversation.requesterId ? (conversation.requesterId === userId ? 'outgoing' : 'incoming') : null,
     lastMessage: conversation.messages[0] ?? null, unreadCount: conversation._count.messages,
-    canSend: conversation.status === 'accepted' ||
-      (conversation.status === 'mutual' && await areMutualFollowers(userId, otherUser.id)) ||
+    requiresRequest,
+    canSend: conversation.status === 'accepted' || mutual || requiresRequest ||
       (conversation.status === 'pending' && conversation.requesterId === userId && conversation.messages.length === 0)
   };
 }
@@ -144,8 +146,14 @@ export async function sendMessage(userId: string, conversationId: string, input:
         if (await tx.message.count({ where: { conversationId } })) {
           throw new MessagingError(403, 'request_pending', 'Your request is pending. Wait for it to be accepted before sending another message.');
         }
-      } else if (current.status === 'mutual' && !await areMutualFollowers(userId, otherId, tx)) {
-        throw new MessagingError(403, 'mutual_follow_required', 'Messaging is paused because you no longer follow each other.');
+      } else if (current.status === 'mutual') {
+        if (await areMutualFollowers(userId, otherId, tx)) {
+          // Establish lasting permission atomically with the first valid mutual message.
+          await tx.conversation.update({ where: { id: conversationId }, data: { status: 'accepted' } });
+        } else {
+          // Opening an empty chat is not consent: the first sender must request it.
+          await tx.conversation.update({ where: { id: conversationId }, data: { status: 'pending', requesterId: userId } });
+        }
       }
       const saved = await tx.message.create({ data: { ...data, senderId: userId, conversationId } });
       await tx.conversation.update({ where: { id: conversationId }, data: { updatedAt: new Date() } });

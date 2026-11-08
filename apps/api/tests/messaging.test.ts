@@ -129,10 +129,11 @@ test('messaging REST, persistence, private delivery, and access controls', {
       await connect(tokens[1]);
     });
 
-    await t.test('unfollowing pauses sends without hiding history', async () => {
+    await t.test('unfollowing keeps established chats open without hiding history', async () => {
       await prisma.follow.delete({ where: { followerId_followingId: { followerId: ids[0], followingId: ids[1] } } });
-      assert.equal((await request(0, `/${conversationId}/messages`, { body: 'Should not send', clientMessageId: randomUUID() })).status, 403);
-      assert.equal((await request(0, `/${conversationId}`)).data.conversation.canSend, false);
+      assert.equal((await request(0, `/${conversationId}/messages`, { body: 'Still connected', clientMessageId: randomUUID() })).status, 201);
+      assert.equal((await request(0, `/${conversationId}`)).data.conversation.canSend, true);
+      assert.equal((await request(1, `/${conversationId}`)).data.conversation.status, 'accepted');
       assert.equal((await request(0, `/${conversationId}/messages`)).status, 200);
     });
 

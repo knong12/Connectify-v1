@@ -138,6 +138,112 @@ test('message request consent, concurrency, inboxes, and private notifications',
       assert.deepEqual(results.map((result) => result.status).sort(), [200, 409]);
     });
 
+    await t.test('opening a mutual chat then unfollowing converts only its first message into a request', async () => {
+      await prisma.follow.createMany({ data: [
+        { followerId: ids[4], followingId: ids[5] }, { followerId: ids[5], followingId: ids[4] }
+      ] });
+      const opened = await request(4, '', { targetUserId: ids[5] });
+      const emptyId = opened.data.conversation.id;
+      assert.equal(opened.data.conversation.status, 'mutual');
+      assert.equal(opened.data.conversation.requiresRequest, false);
+      await prisma.follow.delete({ where: { followerId_followingId: { followerId: ids[4], followingId: ids[5] } } });
+      const preview = (await request(4, `/${emptyId}`)).data.conversation;
+      assert.equal(preview.canSend, true);
+      assert.equal(preview.requiresRequest, true);
+      assert.equal(preview.status, 'mutual');
+      assert.equal((await request(4, `/${emptyId}/messages`, message('   '))).status, 400);
+      assert.equal((await prisma.conversation.findUniqueOrThrow({ where: { id: emptyId } })).status, 'mutual');
+      const intro = message('An introduction after unfollowing');
+      const sent = await request(4, `/${emptyId}/messages`, intro);
+      assert.equal(sent.status, 201);
+      assert.equal((await request(4, `/${emptyId}/messages`, intro)).data.message.id, sent.data.message.id);
+      const pending = (await request(5, `/${emptyId}`)).data.conversation;
+      assert.equal(pending.status, 'pending');
+      assert.equal(pending.requestDirection, 'incoming');
+      assert.equal(pending.requiresRequest, false);
+      assert.equal(pending.canSend, false);
+      assert.equal((await request(5, '?folder=requests')).data.conversations[0].id, emptyId);
+      assert.equal((await request(5)).data.conversations.length, 0);
+      assert.equal((await request(4, `/${emptyId}/messages`, message('Second intro'))).status, 403);
+      assert.equal((await request(5, `/${emptyId}/messages`, message('Reply before acceptance'))).status, 403);
+      assert.equal((await request(4, `/${emptyId}/request`, { decision: 'accepted' })).status, 403);
+      assert.equal((await request(5, `/${emptyId}/request`, { decision: 'accepted' })).status, 200);
+      assert.equal((await request(5, `/${emptyId}/messages`, message('Accepted reply'))).status, 201);
+    });
+
+    await t.test('competing first sends after unfollowing create one introduction with the actual sender', async () => {
+      await prisma.follow.createMany({ data: [
+        { followerId: ids[6], followingId: ids[7] }, { followerId: ids[7], followingId: ids[6] }
+      ] });
+      const opened = await request(6, '', { targetUserId: ids[7] });
+      const emptyId = opened.data.conversation.id;
+      await prisma.follow.deleteMany({ where: { followerId: ids[6], followingId: ids[7] } });
+      const results = await Promise.all([
+        request(6, `/${emptyId}/messages`, message('First contender')),
+        request(7, `/${emptyId}/messages`, message('Second contender'))
+      ]);
+      assert.deepEqual(results.map(r => r.status).sort(), [201, 403]);
+      const senderId = results.find(r => r.status === 201)!.data.message.senderId;
+      const saved = await prisma.conversation.findUniqueOrThrow({ where: { id: emptyId } });
+      assert.equal(saved.status, 'pending');
+      assert.equal(saved.requesterId, senderId);
+      assert.equal(await prisma.message.count({ where: { conversationId: emptyId } }), 1);
+    });
+
+    await t.test('the first mutual message establishes lasting consent after both users unfollow', async () => {
+      await prisma.follow.createMany({ data: [
+        { followerId: ids[8], followingId: ids[9] }, { followerId: ids[9], followingId: ids[8] }
+      ] });
+      const opened = await request(8, '', { targetUserId: ids[9] });
+      const historyId = opened.data.conversation.id;
+      assert.equal((await request(8, `/${historyId}/messages`, message('Original mutual message'))).status, 201);
+      await prisma.follow.deleteMany({ where: { followerId: { in: [ids[8], ids[9]] }, followingId: { in: [ids[8], ids[9]] } } });
+      for (const who of [8, 9]) {
+        const preview = (await request(who, `/${historyId}`)).data.conversation;
+        assert.equal(preview.canSend, true);
+        assert.equal(preview.requiresRequest, false);
+        assert.equal((await request(who, `/${historyId}/messages`, message('Still open after unfollowing'))).status, 201);
+      }
+      const saved = await prisma.conversation.findUniqueOrThrow({ where: { id: historyId } });
+      assert.equal(saved.status, 'accepted');
+      assert.equal(saved.requesterId, null);
+      assert.equal((await request(9, `/${historyId}/messages`)).data.messages.length, 3);
+    });
+
+    await t.test('following and unfollowing cannot bypass a pending request', async () => {
+      const opened = await request(10, '', { targetUserId: ids[11] });
+      const pendingId = opened.data.conversation.id;
+      assert.equal((await request(10, `/${pendingId}/messages`, message('One introduction'))).status, 201);
+      await prisma.follow.createMany({ data: [
+        { followerId: ids[10], followingId: ids[11] }, { followerId: ids[11], followingId: ids[10] }
+      ] });
+      for (const who of [10, 11]) {
+        assert.equal((await request(who, `/${pendingId}/messages`, message('Cannot bypass consent'))).status, 403);
+      }
+      await prisma.follow.deleteMany({ where: { followerId: { in: [ids[10], ids[11]] }, followingId: { in: [ids[10], ids[11]] } } });
+      assert.equal((await request(11, `/${pendingId}`)).data.conversation.status, 'pending');
+      assert.equal((await request(11, `/${pendingId}/request`, { decision: 'accepted' })).status, 200);
+      assert.equal((await request(10, `/${pendingId}/messages`, message('Now accepted'))).status, 201);
+      assert.equal((await request(11, `/${pendingId}/messages`, message('Still accepted without follows'))).status, 201);
+    });
+
+    await t.test('invalid first messages grant no consent and concurrent mutual sends establish it once', async () => {
+      await prisma.follow.createMany({ data: [
+        { followerId: ids[12], followingId: ids[13] }, { followerId: ids[13], followingId: ids[12] }
+      ] });
+      const opened = await request(12, '', { targetUserId: ids[13] });
+      const mutualId = opened.data.conversation.id;
+      assert.equal((await request(12, `/${mutualId}/messages`, message('   '))).status, 400);
+      assert.equal((await prisma.conversation.findUniqueOrThrow({ where: { id: mutualId } })).status, 'mutual');
+      const results = await Promise.all([
+        request(12, `/${mutualId}/messages`, message('First mutual send')),
+        request(13, `/${mutualId}/messages`, message('Second mutual send'))
+      ]);
+      assert.deepEqual(results.map(result => result.status), [201, 201]);
+      assert.equal((await prisma.conversation.findUniqueOrThrow({ where: { id: mutualId } })).status, 'accepted');
+      assert.equal(await prisma.message.count({ where: { conversationId: mutualId } }), 2);
+    });
+
     await t.test('request paging is independent of the main inbox and validates cursors', async () => {
       await prisma.conversation.createMany({ data: ids.slice(4).map((sender) => {
         const [memberAId, memberBId] = [sender, ids[1]].sort();
