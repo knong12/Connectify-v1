@@ -10,7 +10,6 @@ export async function upsertUserFromSpotify(
   profile: SpotifyProfile,
   tokens: SpotifyTokenResponse
 ) {
-  // Step 5:
   // Keep this function as the only place that writes Spotify user identity data.
   return prisma.user.upsert({
     where: {
@@ -39,7 +38,7 @@ export async function upsertUserFromSpotify(
 }
 
 export async function finishSpotifyLogin(profile: SpotifyProfile, tokens: SpotifyTokenResponse) {
-  const user = await upsertUserFromSpotify(profile, tokens);
+  const user = await upsertUserFromSpotify(profile, tokens); //creates 
 
   await syncUserMusicData(user.id);
 

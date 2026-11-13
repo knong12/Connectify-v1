@@ -11,7 +11,7 @@ export default function ProfileMessageButton({ userId }: { userId: string }) {
   if (messaging.userId === userId) return null;
   return <div className="profile-message-action">
     <button className="button" type="button" disabled={pending} onClick={async () => {
-      setPending(true); setError('');
+      setPending(true); setError(''); //userId being the person you want to message
       try { const conversation = await messaging.openConversation(userId); navigate(`/messages/${conversation.id}`); }
       catch (failure) { setError(failure instanceof Error ? failure.message : 'Could not open conversation.'); }
       finally { setPending(false); }

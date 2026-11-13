@@ -1,3 +1,7 @@
+//Handles both starting Spotify login and processing Spotifys response
+
+
+
 import { Router } from 'express';
 import { env } from '../config/env.js';
 import { consumeSpotifyAuthState, oauthStateLifetimeMs } from '../services/oauthState.js';
@@ -5,6 +9,7 @@ import {
   createSpotifyAuthState,
   finishSpotifyLogin
 } from '../services/authService.js';
+
 import {
   buildSpotifyAuthorizeUrl,
   exchangeCodeForTokens,
@@ -27,17 +32,26 @@ function failureUrl(code: string) {
   return url.toString();
 }
 
+//creates OAuth state before login, Spotify returns a copy through callback URL
+//browser sends copy through cookie
+//callback below validates that so it returns to where it started
+//validates the state returned through Spotify against browswer cookie and stored login state
 router.get('/spotify', (_req, res) => {
   res.set('Cache-Control', 'no-store');
   try {
+    //creates OAuth state value and sends it along two paths
     const state = createSpotifyAuthState();
-    res.cookie(stateCookie, state, { ...cookieOptions, maxAge: oauthStateLifetimeMs });
-    res.redirect(buildSpotifyAuthorizeUrl(state));
+    res.cookie(stateCookie, state, { ...cookieOptions, maxAge: oauthStateLifetimeMs }); //cookie containing state in browser, then browser sends that cookie back
+    res.redirect(buildSpotifyAuthorizeUrl(state)); 
   } catch {
     res.redirect(failureUrl('unavailable'));
   }
 });
 
+//Receives Spotify respones, validates OAuth state
+//exchanges auth code for Spotify Tokens, fetches Spotify profile
+//calls 'finishSpotifyLogin'
+//on success redirects to frontend profile page
 router.get('/spotify/callback', async (req, res) => {
   res.set('Cache-Control', 'no-store');
   res.set('Referrer-Policy', 'no-referrer');
